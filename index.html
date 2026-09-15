@@ -1,0 +1,6175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta
+    name="description"
+    content="EarnTrack — Survey & Side Hustle Daily Earnings Tracker"
+  />
+  <title>EarnTrack — Survey Earnings Tracker</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            emerald: {
+              450: "#10b981"
+            }
+          },
+          boxShadow: {
+            glow: "0 0 40px rgba(16,185,129,.12)"
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- React / Babel -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+
+<body class="bg-slate-100 dark:bg-slate-950">
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react,typescript" data-type="module">
+    import React, {
+      useEffect,
+      useMemo,
+      useRef,
+      useState
+    } from "https://esm.sh/react@18.3.1";
+
+    import {
+      createRoot
+    } from "https://esm.sh/react-dom@18.3.1/client";
+
+    import {
+      motion,
+      AnimatePresence
+    } from "https://esm.sh/motion@12.23.12/react";
+
+    import {
+      Activity,
+      AlertTriangle,
+      ArrowDownToLine,
+      ArrowLeft,
+      ArrowRight,
+      BarChart3,
+      Bell,
+      CalendarDays,
+      Check,
+      CheckCircle2,
+      ChevronDown,
+      Clock3,
+      Coins,
+      Copy,
+      Database,
+      Download,
+      Edit3,
+      ExternalLink,
+      Flame,
+      Gift,
+      Globe2,
+      History,
+      Home,
+      Info,
+      LayoutDashboard,
+      Link as LinkIcon,
+      ListFilter,
+      Menu,
+      Moon,
+      MoreHorizontal,
+      Pause,
+      Pencil,
+      Play,
+      Plus,
+      RefreshCcw,
+      Save,
+      Settings,
+      Shield,
+      Sparkles,
+      Sun,
+      Target,
+      Timer,
+      Trash2,
+      TrendingUp,
+      Trophy,
+      Upload,
+      Wallet,
+      X,
+      Zap
+    } from "https://esm.sh/lucide-react@0.468.0";
+
+    import {
+      ResponsiveContainer,
+      BarChart,
+      Bar,
+      XAxis,
+      YAxis,
+      CartesianGrid,
+      Tooltip,
+      ReferenceLine,
+      PieChart,
+      Pie,
+      Cell,
+      LineChart,
+      Line,
+      AreaChart,
+      Area
+    } from "https://esm.sh/recharts@2.15.0";
+
+    import confetti from "https://esm.sh/canvas-confetti@1.9.3";
+
+
+    /* =========================================================
+       TYPES
+    ========================================================= */
+
+    type Currency = "GBP" | "USD" | "EUR" | "POINTS";
+
+    type Platform = {
+      id: string;
+      name: string;
+      color: string;
+      currency: Currency;
+      pointsPerGBP?: number;
+      withdrawalThreshold: number;
+      balance: number;
+      url: string;
+      status: "active" | "idle";
+    };
+
+    type Transaction = {
+      id: string;
+      platformId: string;
+      amount: number;
+      note: string;
+      date: string;
+      createdAt: string;
+    };
+
+    type Withdrawal = {
+      id: string;
+      platformId: string;
+      amount: number;
+      method: string;
+      note: string;
+      date: string;
+    };
+
+    type Settings = {
+      dailyTarget: number;
+      weeklyTarget: number;
+      monthlyTarget: number;
+      weekdayTarget: number;
+      weekendTarget: number;
+      redistribution: "rollover" | "flat" | "monthly";
+      usdToGbp: number;
+      eurToGbp: number;
+      pointsPerGBP: number;
+      theme: "dark" | "light";
+      streakFreeze: number;
+      milestones: number[];
+    };
+
+    type Session = {
+      id: string;
+      start: number | null;
+      elapsed: number;
+      running: boolean;
+      date: string;
+    };
+
+
+    /* =========================================================
+       DEFAULT DATA
+    ========================================================= */
+
+    const DEFAULT_PLATFORMS: Platform[] = [
+      {
+        id: "prolific",
+        name: "Prolific",
+        color: "#2563eb",
+        currency: "GBP",
+        withdrawalThreshold: 6,
+        balance: 4.2,
+        url: "https://www.prolific.com/",
+        status: "active"
+      },
+      {
+        id: "swagbucks",
+        name: "Swagbucks",
+        color: "#8b5cf6",
+        currency: "POINTS",
+        pointsPerGBP: 100,
+        withdrawalThreshold: 500,
+        balance: 285,
+        url: "https://www.swagbucks.com/",
+        status: "active"
+      },
+      {
+        id: "yougov",
+        name: "YouGov",
+        color: "#0ea5e9",
+        currency: "POINTS",
+        pointsPerGBP: 100,
+        withdrawalThreshold: 5000,
+        balance: 3250,
+        url: "https://yougov.com/",
+        status: "active"
+      },
+      {
+        id: "usertesting",
+        name: "UserTesting",
+        color: "#f97316",
+        currency: "USD",
+        withdrawalThreshold: 10,
+        balance: 7.5,
+        url: "https://www.usertesting.com/",
+        status: "active"
+      },
+      {
+        id: "qmee",
+        name: "Qmee",
+        color: "#ec4899",
+        currency: "GBP",
+        withdrawalThreshold: 1,
+        balance: 2.15,
+        url: "https://www.qmee.com/",
+        status: "active"
+      },
+      {
+        id: "prime",
+        name: "Prime Opinion",
+        color: "#14b8a6",
+        currency: "POINTS",
+        pointsPerGBP: 100,
+        withdrawalThreshold: 500,
+        balance: 420,
+        url: "https://www.primeopinion.com/",
+        status: "active"
+      }
+    ];
+
+    const DEFAULT_SETTINGS: Settings = {
+      dailyTarget: 4,
+      weeklyTarget: 28,
+      monthlyTarget: 120,
+      weekdayTarget: 4,
+      weekendTarget: 4,
+      redistribution: "rollover",
+      usdToGbp: 0.79,
+      eurToGbp: 0.85,
+      pointsPerGBP: 100,
+      theme: "dark",
+      streakFreeze: 1,
+      milestones: [50, 100, 250, 500, 1000]
+    };
+
+    const todayISO = () => new Date().toISOString().slice(0, 10);
+
+    const uid = () =>
+      Math.random().toString(36).slice(2) +
+      Date.now().toString(36);
+
+    const STORAGE_KEY = "earntrack-v1";
+
+
+    /* =========================================================
+       STORAGE
+    ========================================================= */
+
+    function loadData() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+
+        if (!raw) {
+          return {
+            platforms: DEFAULT_PLATFORMS,
+            transactions: [],
+            withdrawals: [],
+            settings: DEFAULT_SETTINGS,
+            session: {
+              id: uid(),
+              start: null,
+              elapsed: 0,
+              running: false,
+              date: todayISO()
+            }
+          };
+        }
+
+        const parsed = JSON.parse(raw);
+
+        return {
+          platforms: parsed.platforms || DEFAULT_PLATFORMS,
+          transactions: parsed.transactions || [],
+          withdrawals: parsed.withdrawals || [],
+          settings: {
+            ...DEFAULT_SETTINGS,
+            ...(parsed.settings || {})
+          },
+          session: {
+            id: uid(),
+            start: null,
+            elapsed: 0,
+            running: false,
+            date: todayISO(),
+            ...(parsed.session || {})
+          }
+        };
+      } catch (error) {
+        console.error("EarnTrack storage error:", error);
+
+        return {
+          platforms: DEFAULT_PLATFORMS,
+          transactions: [],
+          withdrawals: [],
+          settings: DEFAULT_SETTINGS,
+          session: {
+            id: uid(),
+            start: null,
+            elapsed: 0,
+            running: false,
+            date: todayISO()
+          }
+        };
+      }
+    }
+
+
+    /* =========================================================
+       HELPERS
+    ========================================================= */
+
+    const money = (value: number) =>
+      `£${value.toFixed(2)}`;
+
+    const nativeMoney = (
+      value: number,
+      currency: Currency
+    ) => {
+      if (currency === "GBP") return `£${value.toFixed(2)}`;
+      if (currency === "USD") return `$${value.toFixed(2)}`;
+      if (currency === "EUR") return `€${value.toFixed(2)}`;
+      return `${Math.round(value).toLocaleString()} pts`;
+    };
+
+    const dateLabel = (date: string) =>
+      new Date(date).toLocaleDateString(undefined, {
+        day: "numeric",
+        month: "short",
+        year: "numeric"
+      });
+
+    const shortDate = (date: string) =>
+      new Date(date).toLocaleDateString(undefined, {
+        day: "numeric",
+        month: "short"
+      });
+
+    const timeLabel = (date: string) =>
+      new Date(date).toLocaleTimeString(undefined, {
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+
+    function convertToGBP(
+      amount: number,
+      currency: Currency,
+      settings: Settings,
+      pointsPerGBP?: number
+    ) {
+      if (currency === "GBP") return amount;
+      if (currency === "USD")
+        return amount * settings.usdToGbp;
+      if (currency === "EUR")
+        return amount * settings.eurToGbp;
+
+      return amount /
+        (pointsPerGBP || settings.pointsPerGBP);
+    }
+
+    function formatDuration(seconds: number) {
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      const secs = seconds % 60;
+
+      return [
+        hrs.toString().padStart(2, "0"),
+        mins.toString().padStart(2, "0"),
+        secs.toString().padStart(2, "0")
+      ].join(":");
+    }
+
+    function daysInMonth(year: number, month: number) {
+      return new Date(year, month + 1, 0).getDate();
+    }
+
+    function isSameDay(dateA: string, dateB: string) {
+      return dateA.slice(0, 10) === dateB.slice(0, 10);
+    }
+
+
+    /* =========================================================
+       UI COMPONENTS
+    ========================================================= */
+
+    function Card({
+      children,
+      className = ""
+    }: {
+      children: React.ReactNode;
+      className?: string;
+    }) {
+      return (
+        <div
+          className={
+            "rounded-2xl border border-slate-200/70 dark:border-slate-800 " +
+            "bg-white dark:bg-slate-900 shadow-sm " +
+            className
+          }
+        >
+          {children}
+        </div>
+      );
+    }
+
+    function Button({
+      children,
+      onClick,
+      variant = "primary",
+      className = "",
+      disabled = false
+    }: {
+      children: React.ReactNode;
+      onClick?: () => void;
+      variant?: "primary" | "secondary" | "danger" | "ghost";
+      className?: string;
+      disabled?: boolean;
+    }) {
+      const variants = {
+        primary:
+          "bg-emerald-500 hover:bg-emerald-400 text-white",
+        secondary:
+          "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white",
+        danger:
+          "bg-red-500 hover:bg-red-400 text-white",
+        ghost:
+          "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+      };
+
+      return (
+        <button
+          disabled={disabled}
+          onClick={onClick}
+          className={
+            "min-h-[44px] px-4 rounded-xl font-semibold text-sm " +
+            "transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none " +
+            variants[variant] +
+            " " +
+            className
+          }
+        >
+          {children}
+        </button>
+      );
+    }
+
+    function IconButton({
+      children,
+      onClick,
+      title,
+      danger = false
+    }: {
+      children: React.ReactNode;
+      onClick?: () => void;
+      title?: string;
+      danger?: boolean;
+    }) {
+      return (
+        <button
+          title={title}
+          onClick={onClick}
+          className={
+            "w-11 h-11 rounded-xl flex items-center justify-center transition " +
+            (danger
+              ? "text-red-500 hover:bg-red-500/10"
+              : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800")
+          }
+        >
+          {children}
+        </button>
+      );
+    }
+
+    function Stat({
+      icon,
+      label,
+      value,
+      sub,
+      accent = "emerald"
+    }: {
+      icon: React.ReactNode;
+      label: string;
+      value: string;
+      sub?: string;
+      accent?: string;
+    }) {
+      return (
+        <Card className="p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                {label}
+              </p>
+              <p className="text-2xl font-bold mt-2 text-slate-900 dark:text-white">
+                {value}
+              </p>
+              {sub && (
+                <p className="text-xs text-slate-500 mt-1">
+                  {sub}
+                </p>
+              )}
+            </div>
+
+            <div
+              className={
+                "w-11 h-11 rounded-xl flex items-center justify-center " +
+                `bg-${accent}-500/10 text-${accent}-500`
+              }
+            >
+              {icon}
+            </div>
+          </div>
+        </Card>
+      );
+    }
+
+
+    /* =========================================================
+       MODAL
+    ========================================================= */
+
+    function Modal({
+      open,
+      title,
+      onClose,
+      children,
+      wide = false
+    }: {
+      open: boolean;
+      title: string;
+      onClose: () => void;
+      children: React.ReactNode;
+      wide?: boolean;
+    }) {
+      return (
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-md p-4 flex items-center justify-center"
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget) onClose();
+              }}
+            >
+              <motion.div
+                initial={{
+                  opacity: 0,
+                  scale: 0.92,
+                  y: 20
+                }}
+                animate={{
+                  opacity: 1,
+                  scale: 1,
+                  y: 0
+                }}
+                exit={{
+                  opacity: 0,
+                  scale: 0.92,
+                  y: 20
+                }}
+                transition={{
+                  type: "spring",
+                  stiffness: 320,
+                  damping: 28
+                }}
+                className={
+                  "w-full max-h-[90vh] overflow-y-auto rounded-3xl " +
+                  "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 " +
+                  "shadow-2xl " +
+                  (wide ? "max-w-3xl" : "max-w-lg")
+                }
+              >
+                <div className="sticky top-0 z-10 px-5 py-4 flex items-center justify-between bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-200 dark:border-slate-800">
+                  <h3 className="font-bold text-lg text-slate-900 dark:text-white">
+                    {title}
+                  </h3>
+
+                  <IconButton onClick={onClose}>
+                    <X size={20} />
+                  </IconButton>
+                </div>
+
+                <div className="p-5">
+                  {children}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      );
+    }
+
+
+    /* =========================================================
+       PROGRESS RING
+    ========================================================= */
+
+    function ProgressRing({
+      value,
+      target
+    }: {
+      value: number;
+      target: number;
+    }) {
+      const percentage =
+        target > 0 ? (value / target) * 100 : 0;
+
+      const visualPercentage =
+        Math.min(percentage, 100);
+
+      const radius = 92;
+      const circumference = 2 * Math.PI * radius;
+      const offset =
+        circumference -
+        (visualPercentage / 100) * circumference;
+
+      return (
+        <div className="relative w-64 h-64 mx-auto">
+          <svg
+            viewBox="0 0 220 220"
+            className="w-full h-full -rotate-90"
+          >
+            <circle
+              cx="110"
+              cy="110"
+              r={radius}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="13"
+              className="text-slate-200 dark:text-slate-800"
+            />
+
+            <motion.circle
+              cx="110"
+              cy="110"
+              r={radius}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="13"
+              strokeLinecap="round"
+              className="text-emerald-500"
+              strokeDasharray={circumference}
+              initial={{
+                strokeDashoffset: circumference
+              }}
+              animate={{
+                strokeDashoffset: offset
+              }}
+              transition={{
+                duration: 1.2,
+                ease: "easeOut"
+              }}
+            />
+          </svg>
+
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <p className="text-4xl font-black text-slate-900 dark:text-white">
+              {Math.round(percentage)}%
+            </p>
+
+            <p className="text-sm font-medium text-slate-500">
+              {money(value)} / {money(target)}
+            </p>
+
+            {percentage >= 100 ? (
+              <span className="mt-2 text-xs font-bold text-emerald-500">
+                TARGET CRUSHED
+              </span>
+            ) : (
+              <span className="mt-2 text-xs font-semibold text-slate-500">
+                {money(Math.max(target - value, 0))} remaining
+              </span>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+
+    /* =========================================================
+       APP
+    ========================================================= */
+
+    function App() {
+      const [data, setData] = useState(loadData);
+      const [view, setView] = useState("dashboard");
+      const [mobileMenu, setMobileMenu] = useState(false);
+
+      const [modal, setModal] = useState<string | null>(null);
+
+      const [editingTransaction, setEditingTransaction] =
+        useState<Transaction | null>(null);
+
+      const [selectedDate, setSelectedDate] =
+        useState(todayISO());
+
+      const [editingPlatform, setEditingPlatform] =
+        useState<Platform | null>(null);
+
+      const [search, setSearch] = useState("");
+      const [filterPlatform, setFilterPlatform] =
+        useState("all");
+
+      const [timerNow, setTimerNow] = useState(Date.now());
+
+      /* -------------------------------------------------------
+         Persist
+      ------------------------------------------------------- */
+
+      useEffect(() => {
+        try {
+          localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(data)
+          );
+        } catch (error) {
+          console.error(error);
+        }
+      }, [data]);
+
+
+      /* -------------------------------------------------------
+         Theme
+      ------------------------------------------------------- */
+
+      useEffect(() => {
+        document.documentElement.classList.toggle(
+          "dark",
+          data.settings.theme === "dark"
+        );
+      }, [data.settings.theme]);
+
+
+      /* -------------------------------------------------------
+         Timer tick
+      ------------------------------------------------------- */
+
+      useEffect(() => {
+        if (!data.session.running) return;
+
+        const interval = setInterval(
+          () => setTimerNow(Date.now()),
+          1000
+        );
+
+        return () => clearInterval(interval);
+      }, [data.session.running]);
+
+
+      /* -------------------------------------------------------
+         Derived values
+      ------------------------------------------------------- */
+
+      const today = todayISO();
+
+      const platformMap = useMemo(() => {
+        const map: Record<string, Platform> = {};
+
+        data.platforms.forEach((p) => {
+          map[p.id] = p;
+        });
+
+        return map;
+      }, [data.platforms]);
+
+
+      const convertTransaction = (t: Transaction) => {
+        const p = platformMap[t.platformId];
+
+        if (!p) return 0;
+
+        return convertToGBP(
+          t.amount,
+          p.currency,
+          data.settings,
+          p.pointsPerGBP
+        );
+      };
+
+
+      const todayTransactions =
+        data.transactions.filter(
+          (t) => t.date.slice(0, 10) === today
+        );
+
+
+      const todayEarned =
+        todayTransactions.reduce(
+          (sum, t) => sum + convertTransaction(t),
+          0
+        );
+
+
+      const lifetimeEarned =
+        data.transactions.reduce(
+          (sum, t) => sum + convertTransaction(t),
+          0
+        );
+
+
+      const todayTarget = (() => {
+        const day = new Date(today).getDay();
+
+        return day === 0 || day === 6
+          ? data.settings.weekendTarget
+          : data.settings.weekdayTarget;
+      })();
+
+
+      const sessionElapsed = (() => {
+        if (
+          !data.session.running ||
+          !data.session.start
+        ) {
+          return data.session.elapsed;
+        }
+
+        return (
+          data.session.elapsed +
+          Math.floor(
+            (timerNow - data.session.start) / 1000
+          )
+        );
+      })();
+
+
+      const hourlyRate =
+        sessionElapsed > 0
+          ? todayEarned / (sessionElapsed / 3600)
+          : 0;
+
+
+      /* -------------------------------------------------------
+         Streak
+      ------------------------------------------------------- */
+
+      function calculateStreak() {
+        let streak = 0;
+        const cursor = new Date();
+
+        while (true) {
+          const iso =
+            cursor.toISOString().slice(0, 10);
+
+          const earned =
+            data.transactions
+              .filter(
+                (t) =>
+                  t.date.slice(0, 10) === iso
+              )
+              .reduce(
+                (sum, t) =>
+                  sum + convertTransaction(t),
+                0
+              );
+
+          if (earned >= getTargetForDate(iso)) {
+            streak++;
+            cursor.setDate(
+              cursor.getDate() - 1
+            );
+          } else {
+            break;
+          }
+        }
+
+        return streak;
+      }
+
+
+      function getTargetForDate(date: string) {
+        const day = new Date(date).getDay();
+
+        return day === 0 || day === 6
+          ? data.settings.weekendTarget
+          : data.settings.weekdayTarget;
+      }
+
+
+      const streak = calculateStreak();
+
+
+      /* -------------------------------------------------------
+         Recommendation Engine
+      ------------------------------------------------------- */
+
+      const recommendation = useMemo(() => {
+        const candidates = data.platforms
+          .filter((p) => p.status === "active")
+          .map((p) => {
+            const gbpBalance = convertToGBP(
+              p.balance,
+              p.currency,
+              data.settings,
+              p.pointsPerGBP
+            );
+
+            const thresholdGBP =
+              convertToGBP(
+                p.withdrawalThreshold,
+                p.currency,
+                data.settings,
+                p.pointsPerGBP
+              );
+
+            return {
+              platform: p,
+              gbpBalance,
+              thresholdGBP,
+              remaining: Math.max(
+                thresholdGBP - gbpBalance,
+                0
+              )
+            };
+          })
+          .sort((a, b) =>
+            a.remaining - b.remaining
+          );
+
+        const closest = candidates[0];
+
+        if (!closest) return null;
+
+        const remainingToday =
+          Math.max(
+            todayTarget - todayEarned,
+            0
+          );
+
+        if (
+          closest.remaining <= remainingToday &&
+          closest.remaining > 0
+        ) {
+          return {
+            ...closest,
+            reason:
+              `${closest.platform.name} is only ${money(
+                closest.remaining
+              )} away from cashout.`
+          };
+        }
+
+        return {
+          ...closest,
+          reason:
+            `Focus on ${closest.platform.name}; it is currently the closest platform to a withdrawal.`
+        };
+      }, [
+        data.platforms,
+        data.settings,
+        todayTarget,
+        todayEarned
+      ]);
+
+
+      /* -------------------------------------------------------
+         Transactions
+      ------------------------------------------------------- */
+
+      function saveTransaction(transaction: Transaction) {
+        setData((prev) => {
+          const exists = prev.transactions.some(
+            (t) => t.id === transaction.id
+          );
+
+          return {
+            ...prev,
+            transactions: exists
+              ? prev.transactions.map((t) =>
+                  t.id === transaction.id
+                    ? transaction
+                    : t
+                )
+              : [
+                  transaction,
+                  ...prev.transactions
+                ]
+          };
+        });
+
+        setModal(null);
+        setEditingTransaction(null);
+      }
+
+
+      function deleteTransaction(id: string) {
+        setData((prev) => ({
+          ...prev,
+          transactions:
+            prev.transactions.filter(
+              (t) => t.id !== id
+            )
+        }));
+      }
+
+
+      /* -------------------------------------------------------
+         Timer
+      ------------------------------------------------------- */
+
+      function startTimer() {
+        setData((prev) => ({
+          ...prev,
+          session: {
+            ...prev.session,
+            running: true,
+            start: Date.now()
+          }
+        }));
+      }
+
+
+      function pauseTimer() {
+        setData((prev) => {
+          if (!prev.session.start) {
+            return prev;
+          }
+
+          const elapsed =
+            prev.session.elapsed +
+            Math.floor(
+              (Date.now() -
+                prev.session.start) /
+                1000
+            );
+
+          return {
+            ...prev,
+            session: {
+              ...prev.session,
+              running: false,
+              start: null,
+              elapsed
+            }
+          };
+        });
+      }
+
+
+      function resetTimer() {
+        setData((prev) => ({
+          ...prev,
+          session: {
+            id: uid(),
+            start: null,
+            elapsed: 0,
+            running: false,
+            date: today
+          }
+        }));
+      }
+
+
+      /* -------------------------------------------------------
+         Celebration
+      ------------------------------------------------------- */
+
+      function celebrate() {
+        confetti({
+          particleCount: 180,
+          spread: 100,
+          origin: {
+            y: 0.65
+          }
+        });
+      }
+
+
+      /* -------------------------------------------------------
+         Export
+      ------------------------------------------------------- */
+
+      function exportJSON() {
+        const blob = new Blob(
+          [JSON.stringify(data, null, 2)],
+          {
+            type: "application/json"
+          }
+        );
+
+        downloadBlob(
+          blob,
+          `earntrack-backup-${today}.json`
+        );
+      }
+
+
+      function exportCSV() {
+        const header =
+          "Date,Time,Platform,Amount,Native Currency,GBP Value,Note\n";
+
+        const rows =
+          data.transactions
+            .map((t) => {
+              const p =
+                platformMap[t.platformId];
+
+              if (!p) return "";
+
+              const gbp =
+                convertTransaction(t);
+
+              return [
+                t.date.slice(0, 10),
+                timeLabel(t.date),
+                `"${p.name}"`,
+                t.amount,
+                p.currency,
+                gbp.toFixed(2),
+                `"${(t.note || "")
+                  .replace(/"/g, '""')}"`
+              ].join(",");
+            })
+            .join("\n");
+
+        const blob = new Blob(
+          [header + rows],
+          {
+            type: "text/csv"
+          }
+        );
+
+        downloadBlob(
+          blob,
+          `earntrack-earnings-${today}.csv`
+        );
+      }
+
+
+      function downloadBlob(
+        blob: Blob,
+        filename: string
+      ) {
+        const url =
+          URL.createObjectURL(blob);
+
+        const a =
+          document.createElement("a");
+
+        a.href = url;
+        a.download = filename;
+        a.click();
+
+        URL.revokeObjectURL(url);
+      }
+
+
+      /* -------------------------------------------------------
+         Demo data
+      ------------------------------------------------------- */
+
+      function loadDemoData() {
+        const platforms = DEFAULT_PLATFORMS;
+
+        const demo = [];
+
+        for (let i = 0; i < 30; i++) {
+          const d = new Date();
+
+          d.setDate(
+            d.getDate() - i
+          );
+
+          const date =
+            d.toISOString().slice(0, 10);
+
+          const active =
+            platforms[
+              i % platforms.length
+            ];
+
+          const amount =
+            active.currency === "GBP"
+              ? 1.25 + Math.random() * 4
+              : active.currency === "USD"
+              ? 1 + Math.random() * 6
+              : 100 +
+                Math.random() * 500;
+
+          demo.push({
+            id: uid(),
+            platformId: active.id,
+            amount:
+              Math.round(amount * 100) /
+              100,
+            note:
+              [
+                "Short survey",
+                "Academic study",
+                "Product feedback",
+                "User test",
+                "Daily survey",
+                "Opinion panel"
+              ][i % 6],
+            date:
+              `${date}T${String(
+                9 + (i % 10)
+              ).padStart(2, "0")}:${String(
+                (i * 13) % 60
+              ).padStart(2, "0")}:00`,
+            createdAt:
+              new Date().toISOString()
+          });
+        }
+
+        setData((prev) => ({
+          ...prev,
+          transactions: demo
+        }));
+      }
+
+
+      /* -------------------------------------------------------
+         Clear Today
+      ------------------------------------------------------- */
+
+      function clearToday() {
+        setData((prev) => ({
+          ...prev,
+          transactions:
+            prev.transactions.filter(
+              (t) =>
+                t.date.slice(0, 10) !==
+                today
+            )
+        }));
+
+        setModal(null);
+      }
+
+
+      function resetAll() {
+        localStorage.removeItem(
+          STORAGE_KEY
+        );
+
+        window.location.reload();
+      }
+
+
+      /* -------------------------------------------------------
+         Navigation
+      ------------------------------------------------------- */
+
+      const navigation = [
+        {
+          id: "dashboard",
+          label: "Dashboard",
+          icon: LayoutDashboard
+        },
+        {
+          id: "earnings",
+          label: "Earnings Hub",
+          icon: Coins
+        },
+        {
+          id: "history",
+          label: "History",
+          icon: CalendarDays
+        },
+        {
+          id: "analytics",
+          label: "Analytics",
+          icon: BarChart3
+        },
+        {
+          id: "withdrawals",
+          label: "Withdrawals",
+          icon: Wallet
+        },
+        {
+          id: "settings",
+          label: "Settings",
+          icon: Settings
+        }
+      ];
+
+
+      function navigate(id: string) {
+        setView(id);
+        setMobileMenu(false);
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth"
+        });
+      }
+
+
+      /* =======================================================
+         DASHBOARD
+      ======================================================= */
+
+      function Dashboard() {
+        const percentage =
+          todayTarget > 0
+            ? todayEarned /
+              todayTarget *
+              100
+            : 0;
+
+        return (
+          <div className="space-y-6">
+
+            {/* Hero */}
+            <Card className="overflow-hidden">
+              <div className="p-6 lg:p-8 relative">
+
+                <div className="absolute -top-32 -right-32 w-80 h-80 rounded-full bg-emerald-500/10 blur-3xl" />
+
+                <div className="relative grid lg:grid-cols-[1fr_auto] gap-8 items-center">
+
+                  <div>
+                    <div className="flex items-center gap-2 text-emerald-500 font-bold text-sm">
+                      <Sparkles size={16} />
+                      TODAY'S EARNING MISSION
+                    </div>
+
+                    <h1 className="text-3xl lg:text-4xl font-black text-slate-900 dark:text-white mt-3">
+                      Make today count.
+                    </h1>
+
+                    <p className="text-slate-500 mt-2 max-w-xl">
+                      You're tracking{" "}
+                      <b className="text-slate-900 dark:text-white">
+                        {money(todayEarned)}
+                      </b>{" "}
+                      toward your{" "}
+                      <b className="text-slate-900 dark:text-white">
+                        {money(todayTarget)}
+                      </b>{" "}
+                      target.
+                    </p>
+
+                    <div className="flex flex-wrap gap-3 mt-6">
+
+                      <Button
+                        onClick={() =>
+                          setModal(
+                            "transaction"
+                          )
+                        }
+                      >
+                        <span className="flex items-center gap-2">
+                          <Plus size={18} />
+                          Log Survey Earning
+                        </span>
+                      </Button>
+
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          if (
+                            percentage >=
+                            100
+                          ) {
+                            celebrate();
+                          }
+
+                          setModal(
+                            "recap"
+                          );
+                        }}
+                      >
+                        <span className="flex items-center gap-2">
+                          <CheckCircle2
+                            size={18}
+                          />
+                          Finish Day Recap
+                        </span>
+                      </Button>
+
+                      <Button
+                        variant="secondary"
+                        onClick={() =>
+                          setModal(
+                            "timer"
+                          )
+                        }
+                      >
+                        <span className="flex items-center gap-2">
+                          <Timer size={18} />
+                          Work Session
+                        </span>
+                      </Button>
+
+                    </div>
+
+                    <div className="flex flex-wrap gap-5 mt-7 text-sm">
+
+                      <div className="flex items-center gap-2">
+                        <Flame
+                          size={17}
+                          className="text-orange-500"
+                        />
+                        <b className="text-slate-900 dark:text-white">
+                          {streak}
+                        </b>
+                        <span className="text-slate-500">
+                          day streak
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Shield
+                          size={17}
+                          className="text-blue-500"
+                        />
+                        <b className="text-slate-900 dark:text-white">
+                          {data.settings.streakFreeze}
+                        </b>
+                        <span className="text-slate-500">
+                          freeze
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Zap
+                          size={17}
+                          className="text-amber-500"
+                        />
+                        <b className="text-slate-900 dark:text-white">
+                          {money(hourlyRate)}
+                        </b>
+                        <span className="text-slate-500">
+                          /hr pace
+                        </span>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  <div>
+                    <ProgressRing
+                      value={todayEarned}
+                      target={todayTarget}
+                    />
+                  </div>
+
+                </div>
+              </div>
+            </Card>
+
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+              <Stat
+                icon={<Target size={20} />}
+                label="Today"
+                value={money(todayEarned)}
+                sub={
+                  todayEarned >= todayTarget
+                    ? "Target reached"
+                    : `${money(
+                        todayTarget -
+                          todayEarned
+                      )} to go`
+                }
+              />
+
+              <Stat
+                icon={<TrendingUp size={20} />}
+                label="Lifetime"
+                value={money(lifetimeEarned)}
+                sub={`${data.transactions.length} transactions`}
+              />
+
+              <Stat
+                icon={<Clock3 size={20} />}
+                label="Session"
+                value={formatDuration(
+                  sessionElapsed
+                )}
+                sub={
+                  data.session.running
+                    ? "Timer running"
+                    : "Not running"
+                }
+                accent="blue"
+              />
+
+              <Stat
+                icon={<Trophy size={20} />}
+                label="Hourly Pace"
+                value={money(hourlyRate)}
+                sub="Today's efficiency"
+                accent="amber"
+              />
+
+            </div>
+
+
+            {/* Timer */}
+            <Card className="p-5">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+
+                <div className="flex items-center gap-4">
+
+                  <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                    <Timer />
+                  </div>
+
+                  <div>
+                    <p className="font-bold text-slate-900 dark:text-white">
+                      Work Session
+                    </p>
+
+                    <p className="text-sm text-slate-500">
+                      Track active grinding time and calculate your real hourly rate.
+                    </p>
+                  </div>
+
+                </div>
+
+                <div className="flex items-center gap-3">
+
+                  <span className="font-mono font-bold text-xl text-slate-900 dark:text-white">
+                    {formatDuration(
+                      sessionElapsed
+                    )}
+                  </span>
+
+                  {!data.session.running ? (
+                    <Button
+                      onClick={
+                        startTimer
+                      }
+                    >
+                      <span className="flex gap-2 items-center">
+                        <Play size={17} />
+                        Start
+                      </span>
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      onClick={
+                        pauseTimer
+                      }
+                    >
+                      <span className="flex gap-2 items-center">
+                        <Pause size={17} />
+                        Pause
+                      </span>
+                    </Button>
+                  )}
+
+                  <IconButton
+                    title="Reset timer"
+                    onClick={
+                      resetTimer
+                    }
+                  >
+                    <RefreshCcw size={18} />
+                  </IconButton>
+
+                </div>
+
+              </div>
+            </Card>
+
+
+            {/* Recommendation */}
+            {recommendation && (
+              <motion.div
+                initial={{
+                  opacity: 0,
+                  y: 10
+                }}
+                animate={{
+                  opacity: 1,
+                  y: 0
+                }}
+              >
+                <Card className="p-5 border-emerald-500/30 bg-emerald-500/[0.03]">
+
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+
+                    <div className="flex gap-4">
+
+                      <div
+                        className="w-12 h-12 rounded-xl flex items-center justify-center text-white"
+                        style={{
+                          backgroundColor:
+                            recommendation
+                              .platform
+                              .color
+                        }}
+                      >
+                        <Zap size={21} />
+                      </div>
+
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wider text-emerald-500">
+                            Smart Next Action
+                          </span>
+
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-bold">
+                            RECOMMENDED
+                          </span>
+                        </div>
+
+                        <h3 className="font-bold text-lg text-slate-900 dark:text-white mt-1">
+                          {recommendation.platform.name}
+                        </h3>
+
+                        <p className="text-sm text-slate-500">
+                          {recommendation.reason}
+                        </p>
+                      </div>
+
+                    </div>
+
+                    <div className="flex items-center gap-3">
+
+                      <div className="text-right hidden sm:block">
+                        <p className="text-xs text-slate-500">
+                          Balance
+                        </p>
+                        <p className="font-bold text-slate-900 dark:text-white">
+                          {money(
+                            recommendation.gbpBalance
+                          )}
+                        </p>
+                      </div>
+
+                      <Button
+                        onClick={() =>
+                          window.open(
+                            recommendation
+                              .platform.url,
+                            "_blank"
+                          )
+                        }
+                      >
+                        <span className="flex gap-2 items-center">
+                          Open Platform
+                          <ExternalLink
+                            size={16}
+                          />
+                        </span>
+                      </Button>
+
+                    </div>
+
+                  </div>
+
+                </Card>
+              </motion.div>
+            )}
+
+
+            {/* Platforms */}
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                    Platform Balances
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    See what is closest to cashout.
+                  </p>
+                </div>
+
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    navigate(
+                      "settings"
+                    )
+                  }
+                >
+                  Manage
+                </Button>
+              </div>
+
+              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+
+                {data.platforms.map(
+                  (p) => {
+                    const gbp =
+                      convertToGBP(
+                        p.balance,
+                        p.currency,
+                        data.settings,
+                        p.pointsPerGBP
+                      );
+
+                    const threshold =
+                      convertToGBP(
+                        p.withdrawalThreshold,
+                        p.currency,
+                        data.settings,
+                        p.pointsPerGBP
+                      );
+
+                    const percent =
+                      threshold > 0
+                        ? Math.min(
+                            (gbp /
+                              threshold) *
+                              100,
+                            100
+                          )
+                        : 0;
+
+                    return (
+                      <motion.div
+                        key={p.id}
+                        whileHover={{
+                          y: -3
+                        }}
+                      >
+                        <Card className="p-5 h-full">
+
+                          <div className="flex items-start justify-between">
+
+                            <div className="flex gap-3">
+
+                              <div
+                                className="w-11 h-11 rounded-xl flex items-center justify-center text-white font-black"
+                                style={{
+                                  backgroundColor:
+                                    p.color
+                                }}
+                              >
+                                {p.name
+                                  .slice(
+                                    0,
+                                    1
+                                  )
+                                  .toUpperCase()}
+                              </div>
+
+                              <div>
+                                <h3 className="font-bold text-slate-900 dark:text-white">
+                                  {p.name}
+                                </h3>
+
+                                <p className="text-xs text-slate-500 mt-1">
+                                  {p.status ===
+                                  "active"
+                                    ? "Active"
+                                    : "Idle"}{" "}
+                                  ·{" "}
+                                  {p.currency}
+                                </p>
+                              </div>
+
+                            </div>
+
+                            <span
+                              className={
+                                "w-2.5 h-2.5 rounded-full mt-2 " +
+                                (p.status ===
+                                "active"
+                                  ? "bg-emerald-500"
+                                  : "bg-slate-400")
+                              }
+                            />
+
+                          </div>
+
+
+                          <div className="mt-5">
+
+                            <div className="flex justify-between items-end">
+                              <div>
+                                <p className="text-xs text-slate-500">
+                                  Native balance
+                                </p>
+
+                                <p className="text-lg font-bold text-slate-900 dark:text-white">
+                                  {nativeMoney(
+                                    p.balance,
+                                    p.currency
+                                  )}
+                                </p>
+                              </div>
+
+                              <div className="text-right">
+                                <p className="text-xs text-slate-500">
+                                  GBP value
+                                </p>
+
+                                <p className="font-bold text-emerald-500">
+                                  {money(gbp)}
+                                </p>
+                              </div>
+                            </div>
+
+
+                            <div className="mt-4">
+
+                              <div className="flex justify-between text-xs mb-2">
+                                <span className="text-slate-500">
+                                  Cashout progress
+                                </span>
+
+                                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                  {Math.round(
+                                    percent
+                                  )}
+                                  %
+                                </span>
+                              </div>
+
+                              <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                <motion.div
+                                  initial={{
+                                    width: 0
+                                  }}
+                                  animate={{
+                                    width:
+                                      `${percent}%`
+                                  }}
+                                  className="h-full bg-emerald-500 rounded-full"
+                                />
+                              </div>
+
+                              <p className="text-xs text-slate-500 mt-2">
+                                Threshold{" "}
+                                {money(
+                                  threshold
+                                )}
+                              </p>
+
+                            </div>
+
+                          </div>
+
+
+                          <div className="mt-5 flex gap-2">
+
+                            <Button
+                              className="flex-1"
+                              onClick={() => {
+                                setEditingTransaction(
+                                  null
+                                );
+
+                                setModal(
+                                  "transaction"
+                                );
+                              }}
+                            >
+                              <span className="flex justify-center gap-2 items-center">
+                                <Plus
+                                  size={16}
+                                />
+                                Log Earning
+                              </span>
+                            </Button>
+
+                            <IconButton
+                              title="Open platform"
+                              onClick={() =>
+                                window.open(
+                                  p.url,
+                                  "_blank"
+                                )
+                              }
+                            >
+                              <ExternalLink
+                                size={18}
+                              />
+                            </IconButton>
+
+                          </div>
+
+                        </Card>
+                      </motion.div>
+                    );
+                  }
+                )}
+
+              </div>
+            </section>
+
+
+            {/* Today's transactions */}
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                    Today's Survey Transactions
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    Your latest earning activity.
+                  </p>
+                </div>
+
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    navigate(
+                      "earnings"
+                    )
+                  }
+                >
+                  View Ledger
+                </Button>
+              </div>
+
+              <TransactionList
+                transactions={
+                  todayTransactions
+                }
+                platformMap={
+                  platformMap
+                }
+                onEdit={(t) => {
+                  setEditingTransaction(
+                    t
+                  );
+                  setModal(
+                    "transaction"
+                  );
+                }}
+                onDelete={
+                  deleteTransaction
+                }
+                convert={
+                  convertTransaction
+                }
+              />
+
+            </section>
+
+          </div>
+        );
+      }
+
+
+      /* =======================================================
+         TRANSACTION LIST
+      ======================================================= */
+
+      function TransactionList({
+        transactions,
+        platformMap,
+        onEdit,
+        onDelete,
+        convert
+      }: {
+        transactions: Transaction[];
+        platformMap: Record<
+          string,
+          Platform
+        >;
+        onEdit: (
+          t: Transaction
+        ) => void;
+        onDelete: (
+          id: string
+        ) => void;
+        convert: (
+          t: Transaction
+        ) => number;
+      }) {
+        if (!transactions.length) {
+          return (
+            <Card className="p-10 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 mx-auto flex items-center justify-center text-slate-400">
+                <Coins size={25} />
+              </div>
+
+              <h3 className="font-bold text-slate-900 dark:text-white mt-4">
+                No earnings yet
+              </h3>
+
+              <p className="text-sm text-slate-500 mt-1">
+                Log your first survey earning to start tracking.
+              </p>
+            </Card>
+          );
+        }
+
+        return (
+          <Card className="overflow-hidden">
+            <div className="divide-y divide-slate-200 dark:divide-slate-800">
+
+              {transactions
+                .slice()
+                .sort(
+                  (a, b) =>
+                    new Date(
+                      b.date
+                    ).getTime() -
+                    new Date(
+                      a.date
+                    ).getTime()
+                )
+                .map((t) => {
+                  const p =
+                    platformMap[
+                      t.platformId
+                    ];
+
+                  if (!p)
+                    return null;
+
+                  return (
+                    <div
+                      key={t.id}
+                      className="p-4 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                    >
+
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shrink-0"
+                        style={{
+                          backgroundColor:
+                            p.color
+                        }}
+                      >
+                        {p.name
+                          .slice(0, 1)
+                          .toUpperCase()}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-slate-900 dark:text-white truncate">
+                            {p.name}
+                          </p>
+
+                          <span className="text-xs text-slate-400">
+                            {timeLabel(
+                              t.date
+                            )}
+                          </span>
+                        </div>
+
+                        <p className="text-sm text-slate-500 truncate">
+                          {t.note ||
+                            "Survey earning"}
+                        </p>
+
+                      </div>
+
+                      <div className="text-right">
+                        <p className="font-bold text-emerald-500">
+                          +
+                          {nativeMoney(
+                            t.amount,
+                            p.currency
+                          )}
+                        </p>
+
+                        <p className="text-xs text-slate-500">
+                          {money(
+                            convert(t)
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="flex">
+                        <IconButton
+                          title="Edit"
+                          onClick={() =>
+                            onEdit(t)
+                          }
+                        >
+                          <Pencil
+                            size={16}
+                          />
+                        </IconButton>
+
+                        <IconButton
+                          title="Delete"
+                          danger
+                          onClick={() =>
+                            onDelete(
+                              t.id
+                            )
+                          }
+                        >
+                          <Trash2
+                            size={16}
+                          />
+                        </IconButton>
+                      </div>
+
+                    </div>
+                  );
+                })}
+
+            </div>
+          </Card>
+        );
+      }
+
+
+      /* =======================================================
+         EARNINGS HUB
+      ======================================================= */
+
+      function EarningsHub() {
+        const filtered =
+          data.transactions.filter(
+            (t) => {
+              const p =
+                platformMap[
+                  t.platformId
+                ];
+
+              if (!p) return false;
+
+              const searchMatch =
+                !search ||
+                p.name
+                  .toLowerCase()
+                  .includes(
+                    search.toLowerCase()
+                  ) ||
+                t.note
+                  .toLowerCase()
+                  .includes(
+                    search.toLowerCase()
+                  );
+
+              const platformMatch =
+                filterPlatform ===
+                  "all" ||
+                t.platformId ===
+                  filterPlatform;
+
+              return (
+                searchMatch &&
+                platformMatch
+              );
+            }
+          );
+
+        const total =
+          filtered.reduce(
+            (s, t) =>
+              s + convertTransaction(t),
+            0
+          );
+
+        return (
+          <div className="space-y-6">
+
+            <PageHeader
+              title="Earnings Hub"
+              description="Your complete survey and micro-task earnings ledger."
+              icon={<Coins />}
+            />
+
+            <Card className="p-4">
+
+              <div className="grid md:grid-cols-[1fr_auto_auto] gap-3">
+
+                <div className="relative">
+                  <ListFilter
+                    size={17}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+
+                  <input
+                    value={search}
+                    onChange={(e) =>
+                      setSearch(
+                        e.target.value
+                      )
+                    }
+                    placeholder="Search platform or note..."
+                    className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  />
+                </div>
+
+                <select
+                  value={
+                    filterPlatform
+                  }
+                  onChange={(e) =>
+                    setFilterPlatform(
+                      e.target.value
+                    )
+                  }
+                  className="h-11 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                >
+                  <option value="all">
+                    All platforms
+                  </option>
+
+                  {data.platforms.map(
+                    (p) => (
+                      <option
+                        key={p.id}
+                        value={p.id}
+                      >
+                        {p.name}
+                      </option>
+                    )
+                  )}
+                </select>
+
+                <Button
+                  onClick={() =>
+                    setModal(
+                      "transaction"
+                    )
+                  }
+                >
+                  <span className="flex items-center gap-2">
+                    <Plus size={17} />
+                    Add Earning
+                  </span>
+                </Button>
+
+              </div>
+
+            </Card>
+
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+
+              <Stat
+                icon={<Coins size={20} />}
+                label="Filtered Earnings"
+                value={money(total)}
+              />
+
+              <Stat
+                icon={<Database size={20} />}
+                label="Transactions"
+                value={String(
+                  filtered.length
+                )}
+                accent="blue"
+              />
+
+              <Stat
+                icon={<Target size={20} />}
+                label="Average"
+                value={money(
+                  filtered.length
+                    ? total /
+                        filtered.length
+                    : 0
+                )}
+                accent="amber"
+              />
+
+            </div>
+
+
+            <Card className="overflow-hidden">
+              <div className="p-5 border-b border-slate-200 dark:border-slate-800">
+                <h2 className="font-bold text-slate-900 dark:text-white">
+                  Complete Ledger
+                </h2>
+              </div>
+
+              <TransactionList
+                transactions={
+                  filtered
+                }
+                platformMap={
+                  platformMap
+                }
+                onEdit={(t) => {
+                  setEditingTransaction(
+                    t
+                  );
+                  setModal(
+                    "transaction"
+                  );
+                }}
+                onDelete={
+                  deleteTransaction
+                }
+                convert={
+                  convertTransaction
+                }
+              />
+
+            </Card>
+
+          </div>
+        );
+      }
+
+
+      /* =======================================================
+         HISTORY
+      ======================================================= */
+
+      function HistoryView() {
+        const now =
+          new Date(selectedDate);
+
+        const year =
+          now.getFullYear();
+
+        const month =
+          now.getMonth();
+
+        const totalDays =
+          daysInMonth(
+            year,
+            month
+          );
+
+        const firstDay =
+          new Date(
+            year,
+            month,
+            1
+          ).getDay();
+
+        const cells = [];
+
+        for (
+          let i = 0;
+          i < firstDay;
+          i++
+        ) {
+          cells.push(null);
+        }
+
+        for (
+          let day = 1;
+          day <= totalDays;
+          day++
+        ) {
+          cells.push(day);
+        }
+
+        const monthName =
+          now.toLocaleDateString(
+            undefined,
+            {
+              month: "long",
+              year: "numeric"
+            }
+          );
+
+        function dayData(day: number) {
+          const iso =
+            `${year}-${String(
+              month + 1
+            ).padStart(
+              2,
+              "0"
+            )}-${String(
+              day
+            ).padStart(
+              2,
+              "0"
+            )}`;
+
+          const earned =
+            data.transactions
+              .filter(
+                (t) =>
+                  t.date.slice(
+                    0,
+                    10
+                  ) === iso
+              )
+              .reduce(
+                (s, t) =>
+                  s +
+                  convertTransaction(
+                    t
+                  ),
+                0
+              );
+
+          const target =
+            getTargetForDate(iso);
+
+          return {
+            iso,
+            earned,
+            target
+          };
+        }
+
+        return (
+          <div className="space-y-6">
+
+            <PageHeader
+              title="History & Calendar"
+              description="Review your earning consistency, streaks, and daily performance."
+              icon={
+                <CalendarDays />
+              }
+            />
+
+            <div className="grid md:grid-cols-3 gap-4">
+
+              <Stat
+                icon={<Flame />}
+                label="Current Streak"
+                value={`${streak} days`}
+                accent="orange"
+              />
+
+              <Stat
+                icon={<Trophy />}
+                label="Longest Streak"
+                value={`${calculateLongestStreak()} days`}
+                accent="amber"
+              />
+
+              <Stat
+                icon={<CheckCircle2 />}
+                label="Completion"
+                value={`${calculateCompletion()}%`}
+              />
+
+            </div>
+
+
+            <Card className="p-5">
+
+              <div className="flex items-center justify-between mb-6">
+
+                <IconButton
+                  onClick={() => {
+                    const d =
+                      new Date(
+                        year,
+                        month - 1,
+                        1
+                      );
+
+                    setSelectedDate(
+                      d.toISOString()
+                    );
+                  }}
+                >
+                  <ArrowLeft />
+                </IconButton>
+
+                <h2 className="font-bold text-xl text-slate-900 dark:text-white">
+                  {monthName}
+                </h2>
+
+                <IconButton
+                  onClick={() => {
+                    const d =
+                      new Date(
+                        year,
+                        month + 1,
+                        1
+                      );
+
+                    setSelectedDate(
+                      d.toISOString()
+                    );
+                  }}
+                >
+                  <ArrowRight />
+                </IconButton>
+
+              </div>
+
+
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {[
+                  "Sun",
+                  "Mon",
+                  "Tue",
+                  "Wed",
+                  "Thu",
+                  "Fri",
+                  "Sat"
+                ].map(
+                  (day) => (
+                    <div
+                      key={day}
+                      className="text-center text-xs font-bold text-slate-400 py-2"
+                    >
+                      {day}
+                    </div>
+                  )
+                )}
+              </div>
+
+
+              <div className="grid grid-cols-7 gap-2">
+
+                {cells.map(
+                  (day, index) => {
+                    if (!day) {
+                      return (
+                        <div
+                          key={
+                            `empty-${index}`
+                          }
+                        />
+                      );
+                    }
+
+                    const info =
+                      dayData(day);
+
+                    const reached =
+                      info.earned >=
+                      info.target;
+
+                    const partial =
+                      info.earned > 0 &&
+                      !reached;
+
+                    return (
+                      <button
+                        key={day}
+                        onClick={() =>
+                          setSelectedDate(
+                            info.iso
+                          )
+                        }
+                        className={
+                          "min-h-[70px] rounded-xl p-2 text-left border transition " +
+                          (
+                            reached
+                              ? "bg-emerald-500/10 border-emerald-500/30"
+                              : partial
+                              ? "bg-amber-500/10 border-amber-500/30"
+                              : "bg-slate-50 dark:bg-slate-800/50 border-transparent"
+                          )
+                        }
+                      >
+
+                        <div className="flex justify-between">
+                          <span className="text-xs font-bold text-slate-500">
+                            {day}
+                          </span>
+
+                          {reached && (
+                            <Check
+                              size={13}
+                              className="text-emerald-500"
+                            />
+                          )}
+
+                        </div>
+
+                        <p
+                          className={
+                            "text-sm font-bold mt-2 " +
+                            (
+                              reached
+                                ? "text-emerald-500"
+                                : partial
+                                ? "text-amber-500"
+                                : "text-slate-400"
+                            )
+                          }
+                        >
+                          {money(
+                            info.earned
+                          )}
+                        </p>
+
+                      </button>
+                    );
+                  }
+                )}
+
+              </div>
+
+
+              <div className="flex flex-wrap gap-5 mt-6 text-xs text-slate-500">
+
+                <Legend
+                  label="Target Reached"
+                  color="bg-emerald-500"
+                />
+
+                <Legend
+                  label="Partial"
+                  color="bg-amber-500"
+                />
+
+                <Legend
+                  label="Rest / Zero"
+                  color="bg-slate-400"
+                />
+
+              </div>
+
+            </Card>
+
+
+            <DayBreakdown
+              date={selectedDate}
+            />
+
+          </div>
+        );
+      }
+
+
+      function Legend({
+        label,
+        color
+      }: {
+        label: string;
+        color: string;
+      }) {
+        return (
+          <span className="flex items-center gap-2">
+            <span
+              className={
+                "w-2.5 h-2.5 rounded-full " +
+                color
+              }
+            />
+            {label}
+          </span>
+        );
+      }
+
+
+      function calculateLongestStreak() {
+        const dates = Array.from(
+          new Set(
+            data.transactions.map(
+              (t) =>
+                t.date.slice(
+                  0,
+                  10
+                )
+            )
+          )
+        ).sort();
+
+        let longest = 0;
+        let current = 0;
+
+        dates.forEach(
+          (date, index) => {
+            const target =
+              getTargetForDate(
+                date
+              );
+
+            const earned =
+              data.transactions
+                .filter(
+                  (t) =>
+                    t.date.slice(
+                      0,
+                      10
+                    ) === date
+                )
+                .reduce(
+                  (s, t) =>
+                    s +
+                    convertTransaction(
+                      t
+                    ),
+                  0
+                );
+
+            if (
+              earned >=
+              target
+            ) {
+              current++;
+
+              longest =
+                Math.max(
+                  longest,
+                  current
+                );
+            } else {
+              current = 0;
+            }
+          }
+        );
+
+        return longest;
+      }
+
+
+      function calculateCompletion() {
+        const dates =
+          Array.from(
+            new Set(
+              data.transactions.map(
+                (t) =>
+                  t.date.slice(
+                    0,
+                    10
+                  )
+              )
+            )
+          );
+
+        if (!dates.length)
+          return 0;
+
+        const complete =
+          dates.filter(
+            (date) => {
+              const earned =
+                data.transactions
+                  .filter(
+                    (t) =>
+                      t.date.slice(
+                        0,
+                        10
+                      ) === date
+                  )
+                  .reduce(
+                    (s, t) =>
+                      s +
+                      convertTransaction(
+                        t
+                      ),
+                    0
+                  );
+
+              return (
+                earned >=
+                getTargetForDate(
+                  date
+                )
+              );
+            }
+          ).length;
+
+        return Math.round(
+          complete /
+            dates.length *
+            100
+        );
+      }
+
+
+      function DayBreakdown({
+        date
+      }: {
+        date: string;
+      }) {
+        const tx =
+          data.transactions.filter(
+            (t) =>
+              t.date.slice(
+                0,
+                10
+              ) ===
+              date.slice(
+                0,
+                10
+              )
+          );
+
+        const earned =
+          tx.reduce(
+            (s, t) =>
+              s +
+              convertTransaction(
+                t
+              ),
+            0
+          );
+
+        return (
+          <Card className="p-5">
+
+            <div className="flex items-center justify-between mb-5">
+
+              <div>
+                <p className="text-xs uppercase tracking-wider font-bold text-slate-500">
+                  Day Breakdown
+                </p>
+
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white mt-1">
+                  {dateLabel(
+                    date
+                  )}
+                </h2>
+              </div>
+
+              <div className="text-right">
+                <p className="text-xs text-slate-500">
+                  Earned
+                </p>
+
+                <p className="text-xl font-black text-emerald-500">
+                  {money(
+                    earned
+                  )}
+                </p>
+              </div>
+
+            </div>
+
+            <TransactionList
+              transactions={tx}
+              platformMap={
+                platformMap
+              }
+              onEdit={(t) => {
+                setEditingTransaction(
+                  t
+                );
+                setModal(
+                  "transaction"
+                );
+              }}
+              onDelete={
+                deleteTransaction
+              }
+              convert={
+                convertTransaction
+              }
+            />
+
+          </Card>
+        );
+      }
+
+
+      /* =======================================================
+         ANALYTICS
+      ======================================================= */
+
+      function Analytics() {
+        const days = 14;
+
+        const daily = [];
+
+        for (
+          let i = days - 1;
+          i >= 0;
+          i--
+        ) {
+          const d =
+            new Date();
+
+          d.setDate(
+            d.getDate() - i
+          );
+
+          const iso =
+            d.toISOString()
+              .slice(0, 10);
+
+          const earned =
+            data.transactions
+              .filter(
+                (t) =>
+                  t.date.slice(
+                    0,
+                    10
+                  ) === iso
+              )
+              .reduce(
+                (s, t) =>
+                  s +
+                  convertTransaction(
+                    t
+                  ),
+                0
+              );
+
+          daily.push({
+            date: shortDate(
+              iso
+            ),
+            earned:
+              Number(
+                earned.toFixed(
+                  2
+                )
+              ),
+            target:
+              getTargetForDate(
+                iso
+              )
+          });
+        }
+
+
+        const distribution =
+          data.platforms
+            .map((p) => {
+              const total =
+                data.transactions
+                  .filter(
+                    (t) =>
+                      t.platformId ===
+                      p.id
+                  )
+                  .reduce(
+                    (s, t) =>
+                      s +
+                      convertTransaction(
+                        t
+                      ),
+                    0
+                  );
+
+              return {
+                name: p.name,
+                value:
+                  Number(
+                    total.toFixed(
+                      2
+                    )
+                  ),
+                color:
+                  p.color
+              };
+            })
+            .filter(
+              (x) =>
+                x.value > 0
+            );
+
+
+        const weekdays = [
+          "Sunday",
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday"
+        ];
+
+        const weekdayData =
+          weekdays.map(
+            (name, dayIndex) => {
+              const values =
+                data.transactions
+                  .filter(
+                    (t) =>
+                      new Date(
+                        t.date
+                      ).getDay() ===
+                      dayIndex
+                  );
+
+              const total =
+                values.reduce(
+                  (s, t) =>
+                    s +
+                    convertTransaction(
+                      t
+                    ),
+                  0
+                );
+
+              return {
+                day:
+                  name.slice(
+                    0,
+                    3
+                  ),
+                earnings:
+                  Number(
+                    total.toFixed(
+                      2
+                    )
+                  )
+              };
+            }
+          );
+
+
+        let cumulative = 0;
+
+        const trajectory =
+          daily.map(
+            (d) => {
+              cumulative +=
+                d.earned;
+
+              return {
+                date: d.date,
+                earned:
+                  d.earned,
+                cumulative:
+                  Number(
+                    cumulative.toFixed(
+                      2
+                    )
+                  )
+              };
+            }
+          );
+
+
+        return (
+          <div className="space-y-6">
+
+            <PageHeader
+              title="Analytics & Insights"
+              description="Understand where, when, and how efficiently you earn."
+              icon={
+                <BarChart3 />
+              }
+            />
+
+
+            <div className="grid md:grid-cols-3 gap-4">
+
+              <Stat
+                icon={<TrendingUp />}
+                label="14-Day Earnings"
+                value={money(
+                  daily.reduce(
+                    (s, d) =>
+                      s +
+                      d.earned,
+                    0
+                  )
+                )}
+              />
+
+              <Stat
+                icon={<Zap />}
+                label="Best Day"
+                value={
+                  daily.reduce(
+                    (best, d) =>
+                      d.earned >
+                      best.earned
+                        ? d
+                        : best,
+                    daily[0]
+                  )?.date ||
+                  "—"
+                }
+                accent="amber"
+              />
+
+              <Stat
+                icon={<Activity />}
+                label="Transactions"
+                value={String(
+                  data.transactions.length
+                )}
+                accent="blue"
+              />
+
+            </div>
+
+
+            {/* Daily chart */}
+            <Card className="p-5">
+
+              <div className="mb-5">
+                <h2 className="font-bold text-lg text-slate-900 dark:text-white">
+                  Daily Earnings Trend
+                </h2>
+
+                <p className="text-sm text-slate-500">
+                  Last 14 days vs your daily target.
+                </p>
+              </div>
+
+              <div className="h-[320px]">
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                >
+                  <BarChart
+                    data={daily}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#334155"
+                      opacity={0.3}
+                    />
+
+                    <XAxis
+                      dataKey="date"
+                      tick={{
+                        fontSize: 11
+                      }}
+                    />
+
+                    <YAxis
+                      tick={{
+                        fontSize: 11
+                      }}
+                    />
+
+                    <Tooltip />
+
+                    <ReferenceLine
+                      y={data.settings.dailyTarget}
+                      stroke="#10b981"
+                      strokeDasharray="5 5"
+                    />
+
+                    <Bar
+                      dataKey="earned"
+                      fill="#10b981"
+                      radius={[
+                        6,
+                        6,
+                        0,
+                        0
+                      ]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+            </Card>
+
+
+            <div className="grid lg:grid-cols-2 gap-6">
+
+              {/* Distribution */}
+              <Card className="p-5">
+
+                <div className="mb-4">
+                  <h2 className="font-bold text-lg text-slate-900 dark:text-white">
+                    Platform Distribution
+                  </h2>
+
+                  <p className="text-sm text-slate-500">
+                    Lifetime share of converted earnings.
+                  </p>
+                </div>
+
+                <div className="h-[300px]">
+                  {distribution.length ? (
+                    <ResponsiveContainer
+                      width="100%"
+                      height="100%"
+                    >
+                      <PieChart>
+                        <Pie
+                          data={
+                            distribution
+                          }
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={
+                            70
+                          }
+                          outerRadius={
+                            105
+                          }
+                          paddingAngle={
+                            3
+                          }
+                        >
+                          {distribution.map(
+                            (
+                              entry,
+                              index
+                            ) => (
+                              <Cell
+                                key={
+                                  index
+                                }
+                                fill={
+                                  entry.color
+                                }
+                              />
+                            )
+                          )}
+                        </Pie>
+
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <EmptyChart />
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  {distribution.map(
+                    (item) => (
+                      <div
+                        key={
+                          item.name
+                        }
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <span className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full"
+                            style={{
+                              backgroundColor:
+                                item.color
+                            }}
+                          />
+                          {item.name}
+                        </span>
+
+                        <b className="text-slate-900 dark:text-white">
+                          {money(
+                            item.value
+                          )}
+                        </b>
+                      </div>
+                    )
+                  )}
+                </div>
+
+              </Card>
+
+
+              {/* Weekday */}
+              <Card className="p-5">
+
+                <div className="mb-4">
+                  <h2 className="font-bold text-lg text-slate-900 dark:text-white">
+                    Day-of-Week Performance
+                  </h2>
+
+                  <p className="text-sm text-slate-500">
+                    Which days generate the most money?
+                  </p>
+                </div>
+
+                <div className="h-[340px]">
+                  <ResponsiveContainer
+                    width="100%"
+                    height="100%"
+                  >
+                    <BarChart
+                      data={
+                        weekdayData
+                      }
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="#334155"
+                        opacity={0.3}
+                      />
+
+                      <XAxis
+                        dataKey="day"
+                      />
+
+                      <YAxis />
+
+                      <Tooltip />
+
+                      <Bar
+                        dataKey="earnings"
+                        fill="#f59e0b"
+                        radius={[
+                          6,
+                          6,
+                          0,
+                          0
+                        ]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+              </Card>
+
+            </div>
+
+
+            {/* Cumulative */}
+            <Card className="p-5">
+
+              <div className="mb-4">
+                <h2 className="font-bold text-lg text-slate-900 dark:text-white">
+                  Cumulative Earnings Trajectory
+                </h2>
+
+                <p className="text-sm text-slate-500">
+                  Rolling earnings accumulation.
+                </p>
+              </div>
+
+              <div className="h-[300px]">
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                >
+                  <AreaChart
+                    data={
+                      trajectory
+                    }
+                  >
+                    <defs>
+                      <linearGradient
+                        id="earnGradient"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#10b981"
+                          stopOpacity={
+                            0.35
+                          }
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#10b981"
+                          stopOpacity={
+                            0
+                          }
+                        />
+                      </linearGradient>
+                    </defs>
+
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#334155"
+                      opacity={0.3}
+                    />
+
+                    <XAxis
+                      dataKey="date"
+                    />
+
+                    <YAxis />
+
+                    <Tooltip />
+
+                    <Area
+                      type="monotone"
+                      dataKey="cumulative"
+                      stroke="#10b981"
+                      fill="url(#earnGradient)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+
+            </Card>
+
+          </div>
+        );
+      }
+
+
+      function EmptyChart() {
+        return (
+          <div className="h-full flex items-center justify-center text-slate-400">
+            <div className="text-center">
+              <BarChart3
+                size={35}
+                className="mx-auto mb-2 opacity-40"
+              />
+              No earnings data yet
+            </div>
+          </div>
+        );
+      }
+
+
+      /* =======================================================
+         WITHDRAWALS
+      ======================================================= */
+
+      function Withdrawals() {
+        const eligible =
+          data.platforms.filter(
+            (p) => {
+              const gbp =
+                convertToGBP(
+                  p.balance,
+                  p.currency,
+                  data.settings,
+                  p.pointsPerGBP
+                );
+
+              const threshold =
+                convertToGBP(
+                  p.withdrawalThreshold,
+                  p.currency,
+                  data.settings,
+                  p.pointsPerGBP
+                );
+
+              return (
+                gbp >= threshold &&
+                gbp > 0
+              );
+            }
+          );
+
+        const withdrawn =
+          data.withdrawals.reduce(
+            (s, w) => {
+              const p =
+                platformMap[
+                  w.platformId
+                ];
+
+              return (
+                s +
+                (p
+                  ? convertToGBP(
+                      w.amount,
+                      p.currency,
+                      data.settings,
+                      p.pointsPerGBP
+                    )
+                  : 0)
+              );
+            },
+            0
+          );
+
+        const uncashed =
+          data.platforms.reduce(
+            (s, p) =>
+              s +
+              convertToGBP(
+                p.balance,
+                p.currency,
+                data.settings,
+                p.pointsPerGBP
+              ),
+            0
+          );
+
+        return (
+          <div className="space-y-6">
+
+            <PageHeader
+              title="Withdrawals & Payouts"
+              description="Track cashout readiness and your payout history."
+              icon={<Wallet />}
+            />
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+
+              <Stat
+                icon={<CheckCircle2 />}
+                label="Ready to Cashout"
+                value={String(
+                  eligible.length
+                )}
+              />
+
+              <Stat
+                icon={<Wallet />}
+                label="Lifetime Withdrawn"
+                value={money(
+                  withdrawn
+                )}
+                accent="blue"
+              />
+
+              <Stat
+                icon={<Coins />}
+                label="Currently Uncashed"
+                value={money(
+                  uncashed
+                )}
+                accent="amber"
+              />
+
+            </div>
+
+
+            <section>
+
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
+                Platform Cashout Tracker
+              </h2>
+
+              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+
+                {data.platforms.map(
+                  (p) => {
+                    const balance =
+                      convertToGBP(
+                        p.balance,
+                        p.currency,
+                        data.settings,
+                        p.pointsPerGBP
+                      );
+
+                    const threshold =
+                      convertToGBP(
+                        p.withdrawalThreshold,
+                        p.currency,
+                        data.settings,
+                        p.pointsPerGBP
+                      );
+
+                    const ready =
+                      balance >=
+                      threshold;
+
+                    return (
+                      <Card
+                        key={
+                          p.id
+                        }
+                        className="p-5"
+                      >
+
+                        <div className="flex justify-between">
+
+                          <div>
+                            <h3 className="font-bold text-slate-900 dark:text-white">
+                              {p.name}
+                            </h3>
+
+                            <p className="text-xs text-slate-500 mt-1">
+                              {nativeMoney(
+                                p.balance,
+                                p.currency
+                              )}
+                            </p>
+                          </div>
+
+                          {ready ? (
+                            <span className="px-2.5 py-1 h-fit rounded-full bg-emerald-500/10 text-emerald-500 text-xs font-bold">
+                              READY
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 h-fit rounded-full bg-amber-500/10 text-amber-500 text-xs font-bold">
+                              BUILDING
+                            </span>
+                          )}
+
+                        </div>
+
+                        <div className="mt-5">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-slate-500">
+                              Balance
+                            </span>
+
+                            <b className="text-slate-900 dark:text-white">
+                              {money(
+                                balance
+                              )}
+                            </b>
+                          </div>
+
+                          <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 mt-2 overflow-hidden">
+                            <div
+                              className="h-full bg-emerald-500 rounded-full"
+                              style={{
+                                width:
+                                  `${Math.min(
+                                    balance /
+                                      threshold *
+                                      100,
+                                    100
+                                  )}%`
+                              }}
+                            />
+                          </div>
+
+                          <p className="text-xs text-slate-500 mt-2">
+                            {ready
+                              ? "Minimum reached."
+                              : `${money(
+                                  threshold -
+                                    balance
+                                )} remaining`}
+                          </p>
+                        </div>
+
+                        <Button
+                          className="w-full mt-5"
+                          disabled={!ready}
+                          onClick={() => {
+                            setEditingPlatform(
+                              p
+                            );
+
+                            setModal(
+                              "withdrawal"
+                            );
+                          }}
+                        >
+                          <span className="flex items-center justify-center gap-2">
+                            <Wallet
+                              size={16}
+                            />
+                            Record Payout
+                          </span>
+                        </Button>
+
+                      </Card>
+                    );
+                  }
+                )}
+
+              </div>
+
+            </section>
+
+
+            <Card className="overflow-hidden">
+
+              <div className="p-5 border-b border-slate-200 dark:border-slate-800">
+                <h2 className="font-bold text-slate-900 dark:text-white">
+                  Payout Ledger
+                </h2>
+              </div>
+
+              {!data.withdrawals.length ? (
+                <div className="p-10 text-center text-slate-500">
+                  No withdrawals recorded yet.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-200 dark:divide-slate-800">
+
+                  {data.withdrawals
+                    .slice()
+                    .reverse()
+                    .map(
+                      (w) => {
+                        const p =
+                          platformMap[
+                            w.platformId
+                          ];
+
+                        if (!p)
+                          return null;
+
+                        return (
+                          <div
+                            key={
+                              w.id
+                            }
+                            className="p-4 flex items-center gap-4"
+                          >
+
+                            <div
+                              className="w-10 h-10 rounded-xl text-white flex items-center justify-center font-bold"
+                              style={{
+                                backgroundColor:
+                                  p.color
+                              }}
+                            >
+                              <Wallet
+                                size={17}
+                              />
+                            </div>
+
+                            <div className="flex-1">
+                              <p className="font-semibold text-slate-900 dark:text-white">
+                                {p.name}
+                              </p>
+
+                              <p className="text-xs text-slate-500">
+                                {w.method}
+                                {" · "}
+                                {dateLabel(
+                                  w.date
+                                )}
+                              </p>
+                            </div>
+
+                            <div className="text-right">
+                              <p className="font-bold text-blue-500">
+                                -
+                                {nativeMoney(
+                                  w.amount,
+                                  p.currency
+                                )}
+                              </p>
+
+                              <p className="text-xs text-slate-500">
+                                {money(
+                                  convertToGBP(
+                                    w.amount,
+                                    p.currency,
+                                    data.settings,
+                                    p.pointsPerGBP
+                                  )
+                                )}
+                              </p>
+                            </div>
+
+                          </div>
+                        );
+                      }
+                    )}
+
+                </div>
+              )}
+
+            </Card>
+
+          </div>
+        );
+      }
+
+
+      /* =======================================================
+         SETTINGS
+      ======================================================= */
+
+      function SettingsView() {
+        const [localSettings, setLocalSettings] =
+          useState(
+            data.settings
+          );
+
+        function saveSettings() {
+          setData((prev) => ({
+            ...prev,
+            settings:
+              localSettings
+          }));
+        }
+
+        return (
+          <div className="space-y-6">
+
+            <PageHeader
+              title="Settings & Data"
+              description="Customize goals, currencies, platforms, milestones, and backups."
+              icon={<Settings />}
+            />
+
+
+            {/* Goals */}
+            <Card className="p-5">
+
+              <SectionTitle
+                icon={<Target />}
+                title="Daily Goal Schedule"
+                description="Set your base goal and optional weekday/weekend targets."
+              />
+
+              <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-5">
+
+                <Field
+                  label="Daily Target"
+                  type="number"
+                  step="0.01"
+                  value={
+                    localSettings.dailyTarget
+                  }
+                  onChange={(v) =>
+                    setLocalSettings(
+                      (s) => ({
+                        ...s,
+                        dailyTarget:
+                          Number(v)
+                      })
+                    )
+                  }
+                />
+
+                <Field
+                  label="Weekly Target"
+                  type="number"
+                  step="0.01"
+                  value={
+                    localSettings.weeklyTarget
+                  }
+                  onChange={(v) =>
+                    setLocalSettings(
+                      (s) => ({
+                        ...s,
+                        weeklyTarget:
+                          Number(v)
+                      })
+                    )
+                  }
+                />
+
+                <Field
+                  label="Monthly Target"
+                  type="number"
+                  step="0.01"
+                  value={
+                    localSettings.monthlyTarget
+                  }
+                  onChange={(v) =>
+                    setLocalSettings(
+                      (s) => ({
+                        ...s,
+                        monthlyTarget:
+                          Number(v)
+                      })
+                    )
+                  }
+                />
+
+                <Field
+                  label="Weekday Target"
+                  type="number"
+                  step="0.01"
+                  value={
+                    localSettings.weekdayTarget
+                  }
+                  onChange={(v) =>
+                    setLocalSettings(
+                      (s) => ({
+                        ...s,
+                        weekdayTarget:
+                          Number(v)
+                      })
+                    )
+                  }
+                />
+
+                <Field
+                  label="Weekend Target"
+                  type="number"
+                  step="0.01"
+                  value={
+                    localSettings.weekendTarget
+                  }
+                  onChange={(v) =>
+                    setLocalSettings(
+                      (s) => ({
+                        ...s,
+                        weekendTarget:
+                          Number(v)
+                      })
+                    )
+                  }
+                />
+
+              </div>
+
+              <div className="mt-5">
+
+                <label className="block text-xs font-bold text-slate-500 mb-2">
+                  Missing-Day Redistribution
+                </label>
+
+                <select
+                  value={
+                    localSettings.redistribution
+                  }
+                  onChange={(e) =>
+                    setLocalSettings(
+                      (s) => ({
+                        ...s,
+                        redistribution:
+                          e.target.value
+                      })
+                    )
+                  }
+                  className="w-full md:max-w-md h-11 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                >
+                  <option value="rollover">
+                    Roll over deficit to remaining days
+                  </option>
+
+                  <option value="flat">
+                    Keep flat daily targets
+                  </option>
+
+                  <option value="monthly">
+                    Average out remaining month
+                  </option>
+
+                </select>
+
+              </div>
+
+              <Button
+                className="mt-5"
+                onClick={
+                  saveSettings
+                }
+              >
+                <span className="flex gap-2 items-center">
+                  <Save size={17} />
+                  Save Goals
+                </span>
+              </Button>
+
+            </Card>
+
+
+            {/* Currency */}
+            <Card className="p-5">
+
+              <SectionTitle
+                icon={<Globe2 />}
+                title="Currency Conversion"
+                description="All analytics and goals use GBP as the base currency."
+              />
+
+              <div className="grid md:grid-cols-3 gap-4 mt-5">
+
+                <Field
+                  label="USD → GBP"
+                  type="number"
+                  step="0.0001"
+                  value={
+                    localSettings.usdToGbp
+                  }
+                  onChange={(v) =>
+                    setLocalSettings(
+                      (s) => ({
+                        ...s,
+                        usdToGbp:
+                          Number(v)
+                      })
+                    )
+                  }
+                />
+
+                <Field
+                  label="EUR → GBP"
+                  type="number"
+                  step="0.0001"
+                  value={
+                    localSettings.eurToGbp
+                  }
+                  onChange={(v) =>
+                    setLocalSettings(
+                      (s) => ({
+                        ...s,
+                        eurToGbp:
+                          Number(v)
+                      })
+                    )
+                  }
+                />
+
+                <Field
+                  label="Points per £1"
+                  type="number"
+                  value={
+                    localSettings.pointsPerGBP
+                  }
+                  onChange={(v) =>
+                    setLocalSettings(
+                      (s) => ({
+                        ...s,
+                        pointsPerGBP:
+                          Number(v)
+                      })
+                    )
+                  }
+                />
+
+              </div>
+
+              <div className="mt-4 p-4 rounded-xl bg-blue-500/5 border border-blue-500/20 text-sm text-slate-600 dark:text-slate-300 flex gap-3">
+                <Info
+                  size={18}
+                  className="text-blue-500 shrink-0"
+                />
+
+                Changing these rates recalculates the GBP equivalent of historical earnings and balances.
+              </div>
+
+              <Button
+                className="mt-5"
+                onClick={
+                  saveSettings
+                }
+              >
+                <span className="flex gap-2 items-center">
+                  <RefreshCcw size={17} />
+                  Save Exchange Rates
+                </span>
+              </Button>
+
+            </Card>
+
+
+            {/* Theme */}
+            <Card className="p-5">
+
+              <SectionTitle
+                icon={
+                  localSettings.theme ===
+                  "dark" ? (
+                    <Moon />
+                  ) : (
+                    <Sun />
+                  )
+                }
+                title="Appearance"
+                description="Switch between dark and light mode."
+              />
+
+              <div className="flex gap-3 mt-5">
+
+                <Button
+                  variant={
+                    localSettings.theme ===
+                    "dark"
+                      ? "primary"
+                      : "secondary"
+                  }
+                  onClick={() =>
+                    setLocalSettings(
+                      (s) => ({
+                        ...s,
+                        theme: "dark"
+                      })
+                    )
+                  }
+                >
+                  <span className="flex items-center gap-2">
+                    <Moon size={17} />
+                    Dark
+                  </span>
+                </Button>
+
+                <Button
+                  variant={
+                    localSettings.theme ===
+                    "light"
+                      ? "primary"
+                      : "secondary"
+                  }
+                  onClick={() =>
+                    setLocalSettings(
+                      (s) => ({
+                        ...s,
+                        theme: "light"
+                      })
+                    )
+                  }
+                >
+                  <span className="flex items-center gap-2">
+                    <Sun size={17} />
+                    Light
+                  </span>
+                </Button>
+
+              </div>
+
+              <Button
+                className="mt-4"
+                onClick={
+                  saveSettings
+                }
+              >
+                Apply Theme
+              </Button>
+
+            </Card>
+
+
+            {/* Platforms */}
+            <Card className="p-5">
+
+              <div className="flex items-center justify-between">
+
+                <SectionTitle
+                  icon={<Wallet />}
+                  title="Platform Manager"
+                  description="Manage survey and micro-task platforms."
+                />
+
+                <Button
+                  onClick={() => {
+                    setEditingPlatform(
+                      null
+                    );
+                    setModal(
+                      "platform"
+                    );
+                  }}
+                >
+                  <span className="flex items-center gap-2">
+                    <Plus size={17} />
+                    Add Platform
+                  </span>
+                </Button>
+
+              </div>
+
+              <div className="mt-5 space-y-3">
+
+                {data.platforms.map(
+                  (p) => (
+                    <div
+                      key={
+                        p.id
+                      }
+                      className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60"
+                    >
+
+                      <div
+                        className="w-10 h-10 rounded-xl text-white flex items-center justify-center font-bold"
+                        style={{
+                          backgroundColor:
+                            p.color
+                        }}
+                      >
+                        {p.name
+                          .slice(
+                            0,
+                            1
+                          )
+                          .toUpperCase()}
+                      </div>
+
+                      <div className="flex-1">
+                        <p className="font-semibold text-slate-900 dark:text-white">
+                          {p.name}
+                        </p>
+
+                        <p className="text-xs text-slate-500">
+                          {p.currency}
+                          {" · "}
+                          Threshold:{" "}
+                          {nativeMoney(
+                            p.withdrawalThreshold,
+                            p.currency
+                          )}
+                        </p>
+                      </div>
+
+                      <IconButton
+                        title="Edit platform"
+                        onClick={() => {
+                          setEditingPlatform(
+                            p
+                          );
+                          setModal(
+                            "platform"
+                          );
+                        }}
+                      >
+                        <Pencil
+                          size={17}
+                        />
+                      </IconButton>
+
+                      <IconButton
+                        title="Delete platform"
+                        danger
+                        onClick={() => {
+                          setData(
+                            (
+                              prev
+                            ) => ({
+                              ...prev,
+                              platforms:
+                                prev.platforms.filter(
+                                  (
+                                    x
+                                  ) =>
+                                    x.id !==
+                                    p.id
+                                )
+                            })
+                          );
+                        }}
+                      >
+                        <Trash2
+                          size={17}
+                        />
+                      </IconButton>
+
+                    </div>
+                  )
+                )}
+
+              </div>
+
+            </Card>
+
+
+            {/* Milestones */}
+            <Card className="p-5">
+
+              <SectionTitle
+                icon={<Trophy />}
+                title="Lifetime Milestones"
+                description="Celebrate major earning benchmarks."
+              />
+
+              <div className="flex flex-wrap gap-2 mt-5">
+
+                {localSettings.milestones.map(
+                  (m) => (
+                    <span
+                      key={m}
+                      className="px-3 py-2 rounded-xl bg-amber-500/10 text-amber-500 font-bold text-sm"
+                    >
+                      £{m}
+                    </span>
+                  )
+                )}
+
+              </div>
+
+              <div className="mt-5 flex gap-2">
+                <input
+                  id="newMilestone"
+                  type="number"
+                  placeholder="e.g. 2500"
+                  className="h-11 flex-1 max-w-xs px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                />
+
+                <Button
+                  onClick={() => {
+                    const el =
+                      document.getElementById(
+                        "newMilestone"
+                      ) as HTMLInputElement;
+
+                    const value =
+                      Number(
+                        el.value
+                      );
+
+                    if (
+                      value >
+                      0
+                    ) {
+                      setLocalSettings(
+                        (s) => ({
+                          ...s,
+                          milestones:
+                            [
+                              ...s.milestones,
+                              value
+                            ].sort(
+                              (
+                                a,
+                                b
+                              ) =>
+                                a -
+                                b
+                            )
+                        })
+                      );
+
+                      el.value = "";
+                    }
+                  }}
+                >
+                  Add
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  onClick={
+                    saveSettings
+                  }
+                >
+                  Save
+                </Button>
+              </div>
+
+            </Card>
+
+
+            {/* Data */}
+            <Card className="p-5">
+
+              <SectionTitle
+                icon={<Database />}
+                title="Data Backup & Portability"
+                description="Your data lives locally in this browser."
+              />
+
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
+
+                <Button
+                  variant="secondary"
+                  onClick={
+                    exportJSON
+                  }
+                >
+                  <span className="flex gap-2 items-center justify-center">
+                    <Download size={17} />
+                    Export JSON
+                  </span>
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  onClick={
+                    exportCSV
+                  }
+                >
+                  <span className="flex gap-2 items-center justify-center">
+                    <Download size={17} />
+                    Export CSV
+                  </span>
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  onClick={
+                    loadDemoData
+                  }
+                >
+                  <span className="flex gap-2 items-center justify-center">
+                    <Sparkles size={17} />
+                    Load Demo Data
+                  </span>
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    setModal(
+                      "restore"
+                    )
+                  }
+                >
+                  <span className="flex gap-2 items-center justify-center">
+                    <Upload size={17} />
+                    Restore JSON
+                  </span>
+                </Button>
+
+              </div>
+
+            </Card>
+
+
+            {/* Danger */}
+            <Card className="p-5 border-red-500/20">
+
+              <SectionTitle
+                icon={
+                  <AlertTriangle />
+                }
+                title="Danger Zone"
+                description="These actions cannot be easily undone."
+              />
+
+              <div className="flex flex-wrap gap-3 mt-5">
+
+                <Button
+                  variant="danger"
+                  onClick={() =>
+                    setModal(
+                      "clearToday"
+                    )
+                  }
+                >
+                  Clear Today's Earnings
+                </Button>
+
+                <Button
+                  variant="danger"
+                  onClick={() =>
+                    setModal(
+                      "reset"
+                    )
+                  }
+                >
+                  Reset All Data
+                </Button>
+
+              </div>
+
+            </Card>
+
+          </div>
+        );
+      }
+
+
+      function SectionTitle({
+        icon,
+        title,
+        description
+      }: {
+        icon: React.ReactNode;
+        title: string;
+        description: string;
+      }) {
+        return (
+          <div className="flex gap-3">
+
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+              {icon}
+            </div>
+
+            <div>
+              <h2 className="font-bold text-lg text-slate-900 dark:text-white">
+                {title}
+              </h2>
+
+              <p className="text-sm text-slate-500 mt-0.5">
+                {description}
+              </p>
+            </div>
+
+          </div>
+        );
+      }
+
+
+      function Field({
+        label,
+        value,
+        onChange,
+        type = "text",
+        step
+      }: {
+        label: string;
+        value: any;
+        onChange: (
+          value: string
+        ) => void;
+        type?: string;
+        step?: string;
+      }) {
+        return (
+          <label>
+            <span className="block text-xs font-bold text-slate-500 mb-2">
+              {label}
+            </span>
+
+            <input
+              type={type}
+              step={step}
+              value={value}
+              onChange={(e) =>
+                onChange(
+                  e.target.value
+                )
+              }
+              className="w-full h-11 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/30"
+            />
+          </label>
+        );
+      }
+
+
+      /* =======================================================
+         HEADER
+      ======================================================= */
+
+      function PageHeader({
+        title,
+        description,
+        icon
+      }: {
+        title: string;
+        description: string;
+        icon: React.ReactNode;
+      }) {
+        return (
+          <div className="flex items-center justify-between gap-4">
+
+            <div className="flex gap-4 items-center">
+
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                {icon}
+              </div>
+
+              <div>
+                <h1 className="text-2xl lg:text-3xl font-black text-slate-900 dark:text-white">
+                  {title}
+                </h1>
+
+                <p className="text-sm text-slate-500 mt-1">
+                  {description}
+                </p>
+              </div>
+
+            </div>
+
+          </div>
+        );
+      }
+
+
+      /* =======================================================
+         TRANSACTION MODAL
+      ======================================================= */
+
+      function TransactionModal() {
+        const initialPlatform =
+          editingTransaction
+            ? editingTransaction.platformId
+            : data.platforms[0]?.id ||
+              "";
+
+        const [platformId, setPlatformId] =
+          useState(
+            initialPlatform
+          );
+
+        const platform =
+          platformMap[
+            platformId
+          ];
+
+        const [amount, setAmount] =
+          useState(
+            editingTransaction
+              ? String(
+                  editingTransaction.amount
+                )
+              : ""
+          );
+
+        const [note, setNote] =
+          useState(
+            editingTransaction?.note ||
+              ""
+          );
+
+        const [date, setDate] =
+          useState(
+            editingTransaction
+              ? editingTransaction.date.slice(
+                  0,
+                  16
+                )
+              : new Date()
+                  .toISOString()
+                  .slice(
+                    0,
+                    16
+                  )
+          );
+
+
+        function submit(e: any) {
+          e.preventDefault();
+
+          if (
+            !platformId ||
+            Number(amount) <=
+              0
+          ) {
+            return;
+          }
+
+          saveTransaction({
+            id:
+              editingTransaction?.id ||
+              uid(),
+            platformId,
+            amount:
+              Number(amount),
+            note,
+            date:
+              new Date(
+                date
+              ).toISOString(),
+            createdAt:
+              editingTransaction?.createdAt ||
+              new Date().toISOString()
+          });
+        }
+
+
+        return (
+          <form
+            onSubmit={submit}
+            className="space-y-5"
+          >
+
+            <div className="grid sm:grid-cols-2 gap-4">
+
+              <label>
+                <span className="block text-xs font-bold text-slate-500 mb-2">
+                  Platform
+                </span>
+
+                <select
+                  value={
+                    platformId
+                  }
+                  onChange={(e) =>
+                    setPlatformId(
+                      e.target.value
+                    )
+                  }
+                  className="w-full h-11 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                >
+                  {data.platforms.map(
+                    (p) => (
+                      <option
+                        key={
+                          p.id
+                        }
+                        value={
+                          p.id
+                        }
+                      >
+                        {p.name} ·{" "}
+                        {p.currency}
+                      </option>
+                    )
+                  )}
+                </select>
+              </label>
+
+
+              <label>
+                <span className="block text-xs font-bold text-slate-500 mb-2">
+                  Amount
+                </span>
+
+                <div className="relative">
+
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    value={
+                      amount
+                    }
+                    onChange={(e) =>
+                      setAmount(
+                        e.target
+                          .value
+                      )
+                    }
+                    className="w-full h-11 px-3 pr-16 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                    placeholder="0.00"
+                  />
+
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                    {platform
+                      ?.currency}
+                  </span>
+
+                </div>
+
+                {platform &&
+                  amount && (
+                    <p className="text-xs text-emerald-500 mt-2">
+                      ≈{" "}
+                      {money(
+                        convertToGBP(
+                          Number(
+                            amount
+                          ),
+                          platform.currency,
+                          data.settings,
+                          platform.pointsPerGBP
+                        )
+                      )}
+                    </p>
+                  )}
+
+              </label>
+
+            </div>
+
+
+            <label>
+              <span className="block text-xs font-bold text-slate-500 mb-2">
+                Date & Time
+              </span>
+
+              <input
+                type="datetime-local"
+                value={date}
+                onChange={(e) =>
+                  setDate(
+                    e.target.value
+                  )
+                }
+                className="w-full h-11 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+              />
+            </label>
+
+
+            <label>
+              <span className="block text-xs font-bold text-slate-500 mb-2">
+                Note
+              </span>
+
+              <input
+                value={note}
+                onChange={(e) =>
+                  setNote(
+                    e.target.value
+                  )
+                }
+                placeholder="e.g. 12-minute academic study"
+                className="w-full h-11 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+              />
+            </label>
+
+
+            <div className="flex justify-end gap-3 pt-2">
+
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  setModal(
+                    null
+                  )
+                }
+              >
+                Cancel
+              </Button>
+
+              <Button type="submit">
+                <span className="flex gap-2 items-center">
+                  <Save size={17} />
+                  {editingTransaction
+                    ? "Update Earning"
+                    : "Save Earning"}
+                </span>
+              </Button>
+
+            </div>
+
+          </form>
+        );
+      }
+
+
+      /* =======================================================
+         PLATFORM MODAL
+      ======================================================= */
+
+      function PlatformModal() {
+        const editing =
+          editingPlatform;
+
+        const [name, setName] =
+          useState(
+            editing?.name ||
+              ""
+          );
+
+        const [color, setColor] =
+          useState(
+            editing?.color ||
+              "#10b981"
+          );
+
+        const [currency, setCurrency] =
+          useState<Currency>(
+            editing?.currency ||
+              "GBP"
+          );
+
+        const [threshold, setThreshold] =
+          useState(
+            editing
+              ? String(
+                  editing.withdrawalThreshold
+                )
+              : ""
+          );
+
+        const [balance, setBalance] =
+          useState(
+            editing
+              ? String(
+                  editing.balance
+                )
+              : "0"
+          );
+
+        const [url, setUrl] =
+          useState(
+            editing?.url ||
+              ""
+          );
+
+        const [status, setStatus] =
+          useState<
+            "active" | "idle"
+          >(
+            editing?.status ||
+              "active"
+          );
+
+        const [pointsPerGBP, setPointsPerGBP] =
+          useState(
+            editing?.pointsPerGBP ||
+              data.settings.pointsPerGBP
+          );
+
+
+        function save() {
+          if (!name.trim())
+            return;
+
+          const platform: Platform =
+            {
+              id:
+                editing?.id ||
+                uid(),
+              name:
+                name.trim(),
+              color,
+              currency,
+              withdrawalThreshold:
+                Number(
+                  threshold
+                ),
+              balance:
+                Number(
+                  balance
+                ),
+              url,
+              status,
+              pointsPerGBP:
+                currency ===
+                "POINTS"
+                  ? Number(
+                      pointsPerGBP
+                    )
+                  : undefined
+            };
+
+          setData(
+            (prev) => ({
+              ...prev,
+              platforms:
+                editing
+                  ? prev.platforms.map(
+                      (p) =>
+                        p.id ===
+                        editing.id
+                          ? platform
+                          : p
+                    )
+                  : [
+                      ...prev.platforms,
+                      platform
+                    ]
+            })
+          );
+
+          setModal(null);
+        }
+
+
+        return (
+          <div className="space-y-5">
+
+            <div className="grid sm:grid-cols-2 gap-4">
+
+              <Field
+                label="Platform Name"
+                value={name}
+                onChange={
+                  setName
+                }
+              />
+
+              <label>
+                <span className="block text-xs font-bold text-slate-500 mb-2">
+                  Color
+                </span>
+
+                <input
+                  type="color"
+                  value={color}
+                  onChange={(e) =>
+                    setColor(
+                      e.target
+                        .value
+                    )
+                  }
+                  className="w-full h-11 rounded-xl"
+                />
+              </label>
+
+            </div>
+
+
+            <div className="grid sm:grid-cols-2 gap-4">
+
+              <label>
+                <span className="block text-xs font-bold text-slate-500 mb-2">
+                  Native Currency
+                </span>
+
+                <select
+                  value={
+                    currency
+                  }
+                  onChange={(e) =>
+                    setCurrency(
+                      e.target
+                        .value as Currency
+                    )
+                  }
+                  className="w-full h-11 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                >
+                  <option value="GBP">
+                    GBP (£)
+                  </option>
+                  <option value="USD">
+                    USD ($)
+                  </option>
+                  <option value="EUR">
+                    EUR (€)
+                  </option>
+                  <option value="POINTS">
+                    Points / Tokens
+                  </option>
+                </select>
+              </label>
+
+              <Field
+                label="Withdrawal Threshold"
+                type="number"
+                step="0.01"
+                value={
+                  threshold
+                }
+                onChange={
+                  setThreshold
+                }
+              />
+
+            </div>
+
+
+            {currency ===
+              "POINTS" && (
+              <Field
+                label="Points per £1"
+                type="number"
+                value={
+                  pointsPerGBP
+                }
+                onChange={(v) =>
+                  setPointsPerGBP(
+                    Number(v)
+                  )
+                }
+              />
+            )}
+
+
+            <div className="grid sm:grid-cols-2 gap-4">
+
+              <Field
+                label="Current Balance"
+                type="number"
+                step="0.01"
+                value={
+                  balance
+                }
+                onChange={
+                  setBalance
+                }
+              />
+
+              <label>
+                <span className="block text-xs font-bold text-slate-500 mb-2">
+                  Status
+                </span>
+
+                <select
+                  value={
+                    status
+                  }
+                  onChange={(e) =>
+                    setStatus(
+                      e.target
+                        .value as any
+                    )
+                  }
+                  className="w-full h-11 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                >
+                  <option value="active">
+                    Active
+                  </option>
+                  <option value="idle">
+                    Idle
+                  </option>
+                </select>
+              </label>
+
+            </div>
+
+
+            <Field
+              label="Platform Login / Dashboard URL"
+              value={url}
+              onChange={
+                setUrl
+              }
+            />
+
+
+            <div className="flex justify-end gap-3 pt-3">
+
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  setModal(
+                    null
+                  )
+                }
+              >
+                Cancel
+              </Button>
+
+              <Button
+                onClick={
+                  save
+                }
+              >
+                Save Platform
+              </Button>
+
+            </div>
+
+          </div>
+        );
+      }
+
+
+      /* =======================================================
+         WITHDRAWAL MODAL
+      ======================================================= */
+
+      function WithdrawalModal() {
+        const p =
+          editingPlatform;
+
+        const [amount, setAmount] =
+          useState(
+            p
+              ? String(
+                  p.balance
+                )
+              : "0"
+          );
+
+        const [method, setMethod] =
+          useState(
+            "PayPal"
+          );
+
+        const [note, setNote] =
+          useState(
+            ""
+          );
+
+        const [date, setDate] =
+          useState(
+            today
+          );
+
+
+        if (!p)
+          return null;
+
+
+        function submit() {
+          const value =
+            Number(
+              amount
+            );
+
+          if (
+            value <= 0 ||
+            value >
+              p.balance
+          )
+            return;
+
+          setData(
+            (prev) => ({
+              ...prev,
+              platforms:
+                prev.platforms.map(
+                  (x) =>
+                    x.id ===
+                    p.id
+                      ? {
+                          ...x,
+                          balance:
+                            x.balance -
+                            value
+                        }
+                      : x
+                ),
+              withdrawals:
+                [
+                  ...prev.withdrawals,
+                  {
+                    id:
+                      uid(),
+                    platformId:
+                      p.id,
+                    amount:
+                      value,
+                    method,
+                    note,
+                    date
+                  }
+                ]
+            })
+          );
+
+          setModal(null);
+          setEditingPlatform(
+            null
+          );
+        }
+
+
+        return (
+          <div className="space-y-5">
+
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+
+              <div className="flex justify-between">
+
+                <div>
+                  <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                    AVAILABLE BALANCE
+                  </p>
+
+                  <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                    {nativeMoney(
+                      p.balance,
+                      p.currency
+                    )}
+                  </p>
+                </div>
+
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    setAmount(
+                      String(
+                        p.balance
+                      )
+                    )
+                  }
+                >
+                  Max
+                </Button>
+
+              </div>
+
+            </div>
+
+
+            <Field
+              label={`Payout Amount (${p.currency})`}
+              type="number"
+              step="0.01"
+              value={
+                amount
+              }
+              onChange={
+                setAmount
+              }
+            />
+
+
+            <label>
+              <span className="block text-xs font-bold text-slate-500 mb-2">
+                Payout Method
+              </span>
+
+              <select
+                value={
+                  method
+                }
+                onChange={(e) =>
+                  setMethod(
+                    e.target
+                      .value
+                  )
+                }
+                className="w-full h-11 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+              >
+                <option>
+                  PayPal
+                </option>
+                <option>
+                  Amazon Gift Card
+                </option>
+                <option>
+                  Direct Bank Transfer
+                </option>
+                <option>
+                  Other
+                </option>
+              </select>
+            </label>
+
+
+            <Field
+              label="Payout Date"
+              type="date"
+              value={
+                date
+              }
+              onChange={
+                setDate
+              }
+            />
+
+
+            <Field
+              label="Notes"
+              value={
+                note
+              }
+              onChange={
+                setNote
+              }
+            />
+
+
+            <div className="flex justify-end gap-3">
+
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  setModal(
+                    null
+                  )
+                }
+              >
+                Cancel
+              </Button>
+
+              <Button
+                onClick={
+                  submit
+                }
+              >
+                Record Payout
+              </Button>
+
+            </div>
+
+          </div>
+        );
+      }
+
+
+      /* =======================================================
+         RECAP MODAL
+      ======================================================= */
+
+      function RecapModal() {
+        const targetHit =
+          todayEarned >=
+          todayTarget;
+
+        return (
+          <div className="text-center">
+
+            <div
+              className={
+                "w-20 h-20 rounded-3xl mx-auto flex items-center justify-center " +
+                (
+                  targetHit
+                    ? "bg-emerald-500/10 text-emerald-500"
+                    : "bg-amber-500/10 text-amber-500"
+                )
+              }
+            >
+              {targetHit ? (
+                <Trophy size={38} />
+              ) : (
+                <Target size={38} />
+              )}
+            </div>
+
+            <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-5">
+              {targetHit
+                ? "Day complete! 🎉"
+                : "Day recap"}
+            </h3>
+
+            <p className="text-slate-500 mt-2">
+              You earned{" "}
+              <b className="text-slate-900 dark:text-white">
+                {money(
+                  todayEarned
+                )}
+              </b>{" "}
+              today against a{" "}
+              <b className="text-slate-900 dark:text-white">
+                {money(
+                  todayTarget
+                )}
+              </b>{" "}
+              target.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 mt-6">
+
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800">
+                <p className="text-xs text-slate-500">
+                  Progress
+                </p>
+                <p className="font-black text-lg text-slate-900 dark:text-white mt-1">
+                  {Math.round(
+                    todayEarned /
+                      todayTarget *
+                      100
+                  )}
+                  %
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800">
+                <p className="text-xs text-slate-500">
+                  Streak
+                </p>
+                <p className="font-black text-lg text-slate-900 dark:text-white mt-1">
+                  {streak} days
+                </p>
+              </div>
+
+            </div>
+
+            <Button
+              className="w-full mt-6"
+              onClick={() => {
+                if (
+                  targetHit
+                ) {
+                  celebrate();
+                }
+
+                setModal(
+                  null
+                );
+              }}
+            >
+              <span className="flex justify-center items-center gap-2">
+                <Check size={17} />
+                Finish Recap
+              </span>
+            </Button>
+
+          </div>
+        );
+      }
+
+
+      /* =======================================================
+         TIMER MODAL
+      ======================================================= */
+
+      function TimerModal() {
+        return (
+          <div className="text-center">
+
+            <div className="w-28 h-28 rounded-full bg-blue-500/10 text-blue-500 mx-auto flex items-center justify-center">
+              <Timer size={48} />
+            </div>
+
+            <p className="font-mono text-5xl font-black text-slate-900 dark:text-white mt-6">
+              {formatDuration(
+                sessionElapsed
+              )}
+            </p>
+
+            <p className="text-slate-500 mt-2">
+              Effective rate:{" "}
+              <b className="text-emerald-500">
+                {money(
+                  hourlyRate
+                )}
+                /hr
+              </b>
+            </p>
+
+            <div className="flex justify-center gap-3 mt-7">
+
+              {!data.session.running ? (
+                <Button
+                  onClick={
+                    startTimer
+                  }
+                >
+                  <span className="flex items-center gap-2">
+                    <Play size={18} />
+                    Start Session
+                  </span>
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  onClick={
+                    pauseTimer
+                  }
+                >
+                  <span className="flex items-center gap-2">
+                    <Pause size={18} />
+                    Pause
+                  </span>
+                </Button>
+              )}
+
+              <Button
+                variant="danger"
+                onClick={() => {
+                  resetTimer();
+                  setModal(
+                    null
+                  );
+                }}
+              >
+                Stop & Reset
+              </Button>
+
+            </div>
+
+          </div>
+        );
+      }
+
+
+      /* =======================================================
+         RESTORE MODAL
+      ======================================================= */
+
+      function RestoreModal() {
+        const inputRef =
+          useRef<HTMLInputElement>(
+            null
+          );
+
+        function restore(file: File) {
+          const reader =
+            new FileReader();
+
+          reader.onload = () => {
+            try {
+              const parsed =
+                JSON.parse(
+                  String(
+                    reader.result
+                  )
+                );
+
+              if (
+                !parsed.platforms ||
+                !parsed.transactions
+              ) {
+                throw new Error(
+                  "Invalid backup"
+                );
+              }
+
+              setData({
+                platforms:
+                  parsed.platforms,
+                transactions:
+                  parsed.transactions,
+                withdrawals:
+                  parsed.withdrawals ||
+                  [],
+                settings: {
+                  ...DEFAULT_SETTINGS,
+                  ...(parsed.settings ||
+                    {})
+                },
+                session: {
+                  ...data.session,
+                  ...(parsed.session ||
+                    {})
+                }
+              });
+
+              setModal(
+                null
+              );
+            } catch (e) {
+              console.error(e);
+              alert(
+                "That backup file is invalid."
+              );
+            }
+          };
+
+          reader.readAsText(
+            file
+          );
+        }
+
+        return (
+          <div className="space-y-5">
+
+            <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+              <div className="flex gap-3">
+                <AlertTriangle
+                  className="text-amber-500 shrink-0"
+                />
+
+                <div>
+                  <p className="font-bold text-slate-900 dark:text-white">
+                    Restore backup
+                  </p>
+
+                  <p className="text-sm text-slate-500 mt-1">
+                    Importing will replace the current EarnTrack database in this browser.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <input
+              ref={
+                inputRef
+              }
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={(e) => {
+                const file =
+                  e.target
+                    .files?.[0];
+
+                if (file)
+                  restore(
+                    file
+                  );
+              }}
+            />
+
+            <Button
+              className="w-full"
+              onClick={() =>
+                inputRef.current?.click()
+              }
+            >
+              <span className="flex justify-center gap-2 items-center">
+                <Upload size={18} />
+                Choose JSON Backup
+              </span>
+            </Button>
+
+          </div>
+        );
+      }
+
+
+      /* =======================================================
+         MAIN MODALS
+      ======================================================= */
+
+      function Modals() {
+        return (
+          <>
+            <Modal
+              open={
+                modal ===
+                "transaction"
+              }
+              title={
+                editingTransaction
+                  ? "Edit Earning"
+                  : "Log Survey Earning"
+              }
+              onClose={() =>
+                setModal(
+                  null
+                )
+              }
+            >
+              <TransactionModal />
+            </Modal>
+
+
+            <Modal
+              open={
+                modal ===
+                "platform"
+              }
+              title={
+                editingPlatform
+                  ? "Edit Platform"
+                  : "Add Platform"
+              }
+              onClose={() => {
+                setModal(
+                  null
+                );
+                setEditingPlatform(
+                  null
+                );
+              }}
+            >
+              <PlatformModal />
+            </Modal>
+
+
+            <Modal
+              open={
+                modal ===
+                "withdrawal"
+              }
+              title="Record Platform Payout"
+              onClose={() => {
+                setModal(
+                  null
+                );
+                setEditingPlatform(
+                  null
+                );
+              }}
+            >
+              <WithdrawalModal />
+            </Modal>
+
+
+            <Modal
+              open={
+                modal ===
+                "recap"
+              }
+              title="Daily Recap"
+              onClose={() =>
+                setModal(
+                  null
+                )
+              }
+            >
+              <RecapModal />
+            </Modal>
+
+
+            <Modal
+              open={
+                modal ===
+                "timer"
+              }
+              title="Work Session Timer"
+              onClose={() =>
+                setModal(
+                  null
+                )
+              }
+            >
+              <TimerModal />
+            </Modal>
+
+
+            <Modal
+              open={
+                modal ===
+                "restore"
+              }
+              title="Restore Database"
+              onClose={() =>
+                setModal(
+                  null
+                )
+              }
+            >
+              <RestoreModal />
+            </Modal>
+
+
+            <Modal
+              open={
+                modal ===
+                "clearToday"
+              }
+              title="Clear Today's Earnings?"
+              onClose={() =>
+                setModal(
+                  null
+                )
+              }
+            >
+              <ConfirmDialog
+                icon={
+                  <Trash2 />
+                }
+                title="Clear today"
+                description="This will permanently remove every transaction logged today. Your other historical records will remain."
+                confirm="Clear Today's Earnings"
+                danger
+                onConfirm={
+                  clearToday
+                }
+              />
+            </Modal>
+
+
+            <Modal
+              open={
+                modal ===
+                "reset"
+              }
+              title="Reset EarnTrack?"
+              onClose={() =>
+                setModal(
+                  null
+                )
+              }
+            >
+              <ConfirmDialog
+                icon={
+                  <AlertTriangle />
+                }
+                title="Delete everything"
+                description="This permanently clears your platforms, earnings, withdrawals, goals, and local database."
+                confirm="Reset Everything"
+                danger
+                onConfirm={
+                  resetAll
+                }
+              />
+            </Modal>
+
+          </>
+        );
+      }
+
+
+      function ConfirmDialog({
+        icon,
+        title,
+        description,
+        confirm,
+        onConfirm,
+        danger = false
+      }: {
+        icon: React.ReactNode;
+        title: string;
+        description: string;
+        confirm: string;
+        onConfirm: () => void;
+        danger?: boolean;
+      }) {
+        return (
+          <div className="text-center">
+
+            <div
+              className={
+                "w-16 h-16 rounded-2xl mx-auto flex items-center justify-center " +
+                (danger
+                  ? "bg-red-500/10 text-red-500"
+                  : "bg-emerald-500/10 text-emerald-500")
+              }
+            >
+              {icon}
+            </div>
+
+            <h3 className="font-bold text-xl text-slate-900 dark:text-white mt-5">
+              {title}
+            </h3>
+
+            <p className="text-sm text-slate-500 mt-2">
+              {description}
+            </p>
+
+            <div className="flex justify-center gap-3 mt-6">
+
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  setModal(
+                    null
+                  )
+                }
+              >
+                Cancel
+              </Button>
+
+              <Button
+                variant={
+                  danger
+                    ? "danger"
+                    : "primary"
+                }
+                onClick={
+                  onConfirm
+                }
+              >
+                {confirm}
+              </Button>
+
+            </div>
+
+          </div>
+        );
+      }
+
+
+      /* =======================================================
+         SHELL
+      ======================================================= */
+
+      return (
+        <div className="min-h-screen text-slate-900 dark:text-slate-100">
+
+          {/* Top Navigation */}
+          <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800">
+
+            <div className="max-w-[1500px] mx-auto px-4 lg:px-6">
+
+              <div className="h-16 flex items-center justify-between">
+
+                {/* Logo */}
+                <button
+                  onClick={() =>
+                    navigate(
+                      "dashboard"
+                    )
+                  }
+                  className="flex items-center gap-3"
+                >
+
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                    <Coins
+                      size={21}
+                    />
+                  </div>
+
+                  <div className="hidden sm:block text-left">
+                    <p className="font-black tracking-tight text-slate-900 dark:text-white">
+                      EarnTrack
+                    </p>
+
+                    <p className="text-[10px] uppercase tracking-widest text-slate-500">
+                      Side Hustle OS
+                    </p>
+                  </div>
+
+                </button>
+
+
+                {/* Desktop nav */}
+                <nav className="hidden lg:flex items-center gap-1">
+
+                  {navigation.map(
+                    (item) => {
+                      const Icon =
+                        item.icon;
+
+                      return (
+                        <button
+                          key={
+                            item.id
+                          }
+                          onClick={() =>
+                            navigate(
+                              item.id
+                            )
+                          }
+                          className={
+                            "px-3 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition " +
+                            (view ===
+                            item.id
+                              ? "bg-emerald-500/10 text-emerald-500"
+                              : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800")
+                          }
+                        >
+                          <Icon
+                            size={17}
+                          />
+
+                          {item.label}
+                        </button>
+                      );
+                    }
+                  )}
+
+                </nav>
+
+
+                <div className="flex items-center gap-1">
+
+                  <IconButton
+                    title="Toggle theme"
+                    onClick={() =>
+                      setData(
+                        (prev) => ({
+                          ...prev,
+                          settings: {
+                            ...prev.settings,
+                            theme:
+                              prev.settings.theme ===
+                              "dark"
+                                ? "light"
+                                : "dark"
+                          }
+                        })
+                      )
+                    }
+                  >
+                    {data.settings
+                      .theme ===
+                    "dark" ? (
+                      <Sun
+                        size={19}
+                      />
+                    ) : (
+                      <Moon
+                        size={19}
+                      />
+                    )}
+                  </IconButton>
+
+                  <IconButton
+                    title="Add earning"
+                    onClick={() =>
+                      setModal(
+                        "transaction"
+                      )
+                    }
+                  >
+                    <Plus
+                      size={20}
+                    />
+                  </IconButton>
+
+                  <button
+                    className="lg:hidden w-11 h-11 rounded-xl flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800"
+                    onClick={() =>
+                      setMobileMenu(
+                        !mobileMenu
+                      )
+                    }
+                  >
+                    <Menu />
+                  </button>
+
+                </div>
+
+              </div>
+
+
+              {/* Mobile navigation */}
+              <AnimatePresence>
+                {mobileMenu && (
+                  <motion.div
+                    initial={{
+                      height: 0,
+                      opacity: 0
+                    }}
+                    animate={{
+                      height: "auto",
+                      opacity: 1
+                    }}
+                    exit={{
+                      height: 0,
+                      opacity: 0
+                    }}
+                    className="lg:hidden overflow-hidden"
+                  >
+                    <nav className="pb-4 grid grid-cols-2 gap-2">
+
+                      {navigation.map(
+                        (item) => {
+                          const Icon =
+                            item.icon;
+
+                          return (
+                            <button
+                              key={
+                                item.id
+                              }
+                              onClick={() =>
+                                navigate(
+                                  item.id
+                                )
+                              }
+                              className={
+                                "min-h-[48px] rounded-xl px-3 flex items-center gap-2 text-sm font-semibold " +
+                                (view ===
+                                item.id
+                                  ? "bg-emerald-500 text-white"
+                                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300")
+                              }
+                            >
+                              <Icon
+                                size={17}
+                              />
+                              {item.label}
+                            </button>
+                          );
+                        }
+                      )}
+
+                    </nav>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+            </div>
+          </header>
+
+
+          {/* Main */}
+          <main className="max-w-[1500px] mx-auto px-4 lg:px-6 py-6 lg:py-8 pb-28 lg:pb-10">
+
+            <AnimatePresence
+              mode="wait"
+            >
+
+              <motion.div
+                key={
+                  view
+                }
+                initial={{
+                  opacity: 0,
+                  y: 8
+                }}
+                animate={{
+                  opacity: 1,
+                  y: 0
+                }}
+                transition={{
+                  duration:
+                    0.2
+                }}
+              >
+
+                {view ===
+                  "dashboard" && (
+                  <Dashboard />
+                )}
+
+                {view ===
+                  "earnings" && (
+                  <EarningsHub />
+                )}
+
+                {view ===
+                  "history" && (
+                  <HistoryView />
+                )}
+
+                {view ===
+                  "analytics" && (
+                  <Analytics />
+                )}
+
+                {view ===
+                  "withdrawals" && (
+                  <Withdrawals />
+                )}
+
+                {view ===
+                  "settings" && (
+                  <SettingsView />
+                )}
+
+              </motion.div>
+
+            </AnimatePresence>
+
+          </main>
+
+
+          {/* Mobile bottom nav */}
+          <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 px-2 py-2">
+
+            <div className="grid grid-cols-6 max-w-lg mx-auto">
+
+              {navigation.map(
+                (item) => {
+                  const Icon =
+                    item.icon;
+
+                  return (
+                    <button
+                      key={
+                        item.id
+                      }
+                      onClick={() =>
+                        navigate(
+                          item.id
+                        )
+                      }
+                      className={
+                        "min-h-[52px] flex flex-col items-center justify-center gap-1 rounded-xl " +
+                        (view ===
+                        item.id
+                          ? "text-emerald-500"
+                          : "text-slate-400")
+                      }
+                    >
+                      <Icon
+                        size={19}
+                      />
+
+                      <span className="text-[9px] font-bold">
+                        {item.label
+                          .split(
+                            " "
+                          )[0]}
+                      </span>
+                    </button>
+                  );
+                }
+              )}
+
+            </div>
+
+          </nav>
+
+
+          <Modals />
+
+        </div>
+      );
+    }
+
+
+    /* =========================================================
+       BOOT
+    ========================================================= */
+
+    createRoot(
+      document.getElementById(
+        "root"
+      )
+    ).render(
+      <App />
+    );
+
+  </script>
+</body>
+</html>
